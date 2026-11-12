@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "OpenCode Go quota",
+    "description": "Adds a compact OpenCode Go quota strip below the composer showing how much of the 5-hour, weekly, and monthly Go plan windows you have used; click it for a popover with each window's reset countdown, a refresh action, and the API key setting. The key is read from this profile's stored credential, then OPENCODE_GO_API_KEY (or OPENCODE_ZEN_GO_API_KEY / OPENCODE_API_KEY), then the local OpenCode auth.json (opencode-go entry, honoring XDG_DATA_HOME and OPENCODE_AUTH_CONTENT), and can be saved or cleared from the panel. The Host sends the key only to https://opencode.ai/zen/go/v1/usage, about once a minute unless you press Refresh, and the endpoint returns percentages only, so no dollar amounts are derived. Turn the plugin off to remove the strip and its channel; nothing else in DSH changes."
+  }
+}

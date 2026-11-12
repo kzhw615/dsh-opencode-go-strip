@@ -1,0 +1,127 @@
+# dsh-opencode-go-usage
+
+An [OpenCode Go](https://opencode.ai/go) quota meter for **DeepSeek Harness (DSH)**:
+a compact strip under the composer, and a popover with per-window rings.
+
+> Unofficial. Not affiliated with DeepSeek or with OpenCode.
+
+## What it shows
+
+![The quota strip below the composer](docs/strip.png)
+
+- **Strip** (below the composer, always visible while a session is open): a status
+  dot, the `OpenCode Go` label, and one ring per plan window with its used percentage.
+- **Popover** (click the strip): the title, one row per window with a ring, the used
+  percentage and the reset countdown, plus the API-key controls. Click outside or
+  press <kbd>Esc</kbd> to close.
+- Rings follow the host's own quota meter: a faint track is what is left, the arc is
+  what is used, and the arc turns amber/red at 70%/90%.
+
+The three windows come from the OpenCode Go plan: rolling 5-hour, weekly, monthly.
+
+## Requirements
+
+- DeepSeek Harness with the Web UI (Desktop app or `dsh web`).
+- An OpenCode Go (or Go Plus) subscription.
+- Tested against DSH `0.2.2-rc.2`. The plugin only uses documented extension points
+  (`conversation.composer.dock`, `webServer.register`, `connection.admit`,
+  `credentials`), but DSH moves fast — an incompatibility shows up as the strip
+  failing to appear, not as a crash.
+
+## Install
+
+1. Clone or download this repository.
+2. In DSH: **Settings › Plugins › Add plugin**, then pick this directory.
+3. The bundle enables itself; the strip appears the next time a session is open.
+
+## Configure the key
+
+The key never has to be typed into a config file. Resolution order, first hit wins:
+
+1. The credential record this plugin stores when you save a key in the popover
+   (`opencode-go-usage/api-key`). Tick **This session only (not written to disk)** to
+   keep it in the Host process memory instead — it then disappears when the plugin
+   unloads or DSH restarts.
+2. `OPENCODE_GO_API_KEY`, then `OPENCODE_ZEN_GO_API_KEY`, then `OPENCODE_API_KEY`.
+3. The local OpenCode `auth.json` — `$XDG_DATA_HOME/opencode/auth.json`, its
+   `~/.local/share/opencode/auth.json` default, or `~/.config/opencode/auth.json` —
+   reading the `opencode-go` entry. `OPENCODE_AUTH_CONTENT`, when set, is read instead
+   of a file.
+
+With no key anywhere, the strip reads *No API key · click to set* and the popover
+opens the input form directly.
+
+## Security notes
+
+- The key stays on the Host. The browser half calls a package-private route and only
+  ever receives a mask (`abcd…wxyz`).
+- Saved keys land in DSH's credential store (`~/.dsh/.credentials.yaml`, mode `0600`
+  inside a `0700` directory). That store is **plaintext YAML** and adds no encryption;
+  the same file already holds your other provider keys. Use the session-only option,
+  or an environment variable, if you do not want it on disk.
+- Nothing here logs the key, and the plugin registers no agent tool and writes no
+  session event, so the key never reaches a model request or transcript.
+- The value is sent to exactly one host: `GET https://opencode.ai/zen/go/v1/usage`
+  with an `Authorization: Bearer` header. No other network calls are made.
+- Revoke by rotating the key in the OpenCode console, or **Clear** it in the popover.
+
+## Data and refresh behaviour
+
+The endpoint returns **percentages only** (`percent`, `status`, `resetsAt` per window),
+so no dollar amounts or per-model balances are derived, and several keys are not
+summed. Successful responses are cached for 60 s and failures for 15 s; the strip polls
+about once a minute while the page is visible, and **Refresh** is not throttled. A failed
+refresh keeps the last good numbers on screen with a *last refresh failed* note, and a
+window the endpoint does not report shows *Not reported* instead of disappearing.
+
+## Notes for maintainers
+
+- The plugin mounts its own admitted HTTP route (`/opencode-go-usage`) instead of
+  `connection.rpc.handle()`. In DSH `0.2.2-rc.2` that helper resolves `webServer`
+  against the connection service's own context, which does not inject it, so the call
+  throws `cannot get property "webServer" without inject` for any outside plugin.
+- Styling uses the host's theme and type tokens only (`--dsw-alias-*`, `--dsw-font-*`,
+  `--dsw-radius-*`), with fallbacks, so a renamed token degrades appearance but never
+  breaks rendering.
+- `client.js` is plain browser JavaScript loaded through DSH's module loader; there is
+  no build step, no bundler and no runtime dependency besides React (and `react-dom`
+  for the popover portal, with an inline fallback if a carrier omits it).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+## 中文说明
+
+DSH（DeepSeek Harness）的 OpenCode Go 额度插件：输入框下方一条细条，点击弹出浮层。
+
+- **细条**：状态点 + `OpenCode Go` + 三个窗口的圆环与已用百分比。
+- **浮层**：每个窗口一行（圆环、已用百分比、重置倒计时）+ Key 管理。点空白处或 <kbd>Esc</kbd> 关闭。
+- **圆环**：浅灰轨道是剩余，深灰弧是已用；到 70%/90% 变黄/变红。
+
+### 安装
+
+1. 下载本仓库；
+2. DSH 里 **设置 › 插件 › 添加插件**，选择本目录；
+3. 打开会话即可看到细条。
+
+### 配置 Key
+
+优先级：本插件保存的凭证记录 → `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_GO_API_KEY` /
+`OPENCODE_API_KEY` → 本地 OpenCode 的 `auth.json`（`opencode-go` 条目）。
+
+在浮层里粘贴 Key 即可保存；勾选「仅本次会话使用（不写入磁盘）」则只留在内存里。
+
+### 安全
+
+Key 只留在 Host 侧，浏览器只拿到掩码；只会发往 `https://opencode.ai/zen/go/v1/usage`。
+保存时写入 DSH 凭证库（`~/.dsh/.credentials.yaml`，权限 600，**明文 YAML**，与你其他
+provider key 同一个文件）。插件不写日志、不注册 agent 工具、不写会话事件，Key 不会进入
+对话记录或模型请求。
+
+### 限制
+
+接口只返回百分比，插件不推算金额；接口未列入正式文档，格式变化会显示为查询异常而不是
+假装有数据。

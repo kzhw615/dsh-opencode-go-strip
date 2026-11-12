@@ -1,0 +1,6 @@
+# OpenCode Go quota strip: one Host row serving the usage RPC channel and one
+# Web Client half rendering the strip under the composer.
+- insert:
+    - id: opencode-go-usage
+      name: '@local/opencode-go-usage'
+      config: {}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" role="img" aria-label="OpenCode Go quota">
+  <path d="M10.2 25.8 A11 11 0 1 0 25.8 25.8" fill="none" stroke="#b9cddd" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M10.2 25.8 A11 11 0 0 0 23.0 8.2" fill="none" stroke="#247bbf" stroke-width="3.4" stroke-linecap="round"/>
+  <circle cx="18" cy="18" r="2.3" fill="#247bbf"/>
+</svg>

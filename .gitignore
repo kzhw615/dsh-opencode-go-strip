@@ -1,0 +1,24 @@
+# Dependencies (this bundle has none, but a local install may create these)
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+
+# Build output
+dist/
+lib/
+
+# Logs and local diagnostics
+*.log
+.rpc-debug.log
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local secrets
+.env
+.env.*
+.credentials.yaml

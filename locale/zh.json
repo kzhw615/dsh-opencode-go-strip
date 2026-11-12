@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "OpenCode Go 额度",
+    "description": "在输入框下方加一条紧凑的 OpenCode Go 额度细条，显示 5 小时、本周、本月三个套餐窗口的已用比例；点击会在细条上方弹出面板，显示各窗口重置倒计时，可手动刷新和设置 API Key。Key 依次取自本 profile 保存的凭证、OPENCODE_GO_API_KEY（或 OPENCODE_ZEN_GO_API_KEY / OPENCODE_API_KEY）、本地 OpenCode 的 auth.json（opencode-go 条目，支持 XDG_DATA_HOME 与 OPENCODE_AUTH_CONTENT），也可以在面板里保存或清除。Host 只会把 Key 发往 https://opencode.ai/zen/go/v1/usage，约每分钟一次（手动刷新不受限）；该接口只返回百分比，因此不会推算美元金额。关闭插件即移除细条和它使用的频道，不影响 DSH 其他功能。"
+  }
+}
