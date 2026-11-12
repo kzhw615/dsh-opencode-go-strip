@@ -100,7 +100,16 @@ if (self !== undefined) {
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
-if (existsSync(new URL('../.git', import.meta.url))) {
+/** A shallow clone lacks the pinned commit for reasons unrelated to the index. */
+function cloneIsShallow() {
+  try {
+    return execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: repoRoot, encoding: 'utf8' }).trim() === 'true'
+  } catch {
+    return false
+  }
+}
+const shallow = cloneIsShallow()
+if (existsSync(new URL('../.git', import.meta.url)) && !shallow) {
   for (const plugin of index.plugins ?? []) {
     for (const version of plugin.versions ?? []) {
       if (version.source?.type !== 'git') continue
