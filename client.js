@@ -57,6 +57,8 @@ window.__ModuleLoader__.load({
       'panel.addKey': 'Add another key',
       'panel.thisSession': 'This session',
       'panel.keyLabel': 'Label (optional)',
+      'panel.removeKey': 'Remove key',
+      'panel.removeConfirm': 'Delete?',
       'panel.changeKey': 'Change key',
       'panel.changeShort': 'Change',
       'panel.clearKey': 'Clear',
@@ -119,6 +121,8 @@ window.__ModuleLoader__.load({
       'panel.addKey': '添加新 Key',
       'panel.thisSession': '本次会话',
       'panel.keyLabel': '标签（可选）',
+      'panel.removeKey': '删除 Key',
+      'panel.removeConfirm': '确认？',
       'panel.changeKey': '更换 Key',
       'panel.changeShort': '更换',
       'panel.clearKey': '清除',
@@ -293,6 +297,47 @@ window.__ModuleLoader__.load({
 .ocg-menu-item:hover { background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-layer-2)); }
 .ocg-menu-item[aria-selected="true"] { color: var(--dsw-alias-label-primary); }
 .ocg-menu-item:disabled { opacity: 0.6; cursor: default; }
+.ocg-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: var(--dsw-radius-xs, 4px);
+  color: var(--dsw-alias-label-secondary);
+}
+.ocg-menu-row:hover { background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-layer-2)); }
+.ocg-menu-row[aria-selected="true"] { color: var(--dsw-alias-label-primary); }
+.ocg-menu-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ocg-menu-del {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-xs, 4px);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.ocg-menu-row:hover .ocg-menu-del,
+.ocg-menu-del:focus-visible,
+.ocg-menu-del[data-armed="true"] { opacity: 1; }
+.ocg-menu-del:hover { color: var(--dsw-alias-label-primary); }
+.ocg-menu-del[data-armed="true"] { color: var(--dsw-alias-state-error-primary); }
 .ocg-menu-dot {
   width: 6px;
   height: 6px;
@@ -684,6 +729,7 @@ window.__ModuleLoader__.load({
         const [labelDraft, setLabelDraft] = React.useState('')
         const [menuOpen, setMenuOpen] = React.useState(false)
         const [tip, setTip] = React.useState(null)
+        const [deletingId, setDeletingId] = React.useState(null)
         // Declared after `expanded` so the paused-clock read is initialised.
         const now = useClock(expanded ? CLOCK_MS : 0)
         const lastGoodRef = React.useRef(undefined)
@@ -901,6 +947,26 @@ window.__ModuleLoader__.load({
           }
         }
 
+        const deleteKey = async (id) => {
+          if (deletingId !== id) {
+            // First press arms the button; the second one removes the key.
+            setDeletingId(id)
+            return
+          }
+          setDeletingId(null)
+          setSaving(true)
+          setSaveError(null)
+          try {
+            const info = await callHost('clearKey', { id })
+            setKeyInfo(info)
+            refreshRef.current()
+          } catch (error) {
+            setSaveError(error?.code ?? 'save-failed')
+          } finally {
+            setSaving(false)
+          }
+        }
+
         const keyForm = (editingKey || noKey)
           ? h('form', { className: 'ocg-pop-foot', onSubmit: (event) => { void saveKey(event) } },
             h('input', {
@@ -1068,18 +1134,30 @@ window.__ModuleLoader__.load({
 
         const keyMenu = menuOpen && keyItems.length > 0
           ? h('div', { className: 'ocg-menu', role: 'listbox', 'aria-label': t('panel.keys') },
-            ...keyItems.map((item) => h('button', {
-              type: 'button',
+            ...keyItems.map((item) => h('div', {
               key: item.id,
-              className: 'ocg-menu-item',
+              className: 'ocg-menu-row',
               role: 'option',
               'aria-selected': item.id === keyInfo?.activeId,
+            },
+            h('button', {
+              type: 'button',
+              className: 'ocg-menu-pick',
               disabled: saving,
               onClick: () => { void chooseKey(item.id) },
             },
             h('span', { className: 'ocg-menu-dot', 'data-on': item.id === keyInfo?.activeId ? 'true' : 'false' }),
             h('span', { className: 'ocg-menu-label' }, itemLabel(item)),
-            h('span', { className: 'ocg-mask' }, item.masked))),
+            h('span', { className: 'ocg-mask' }, item.masked)),
+            h('button', {
+              type: 'button',
+              className: 'ocg-menu-del',
+              'data-armed': deletingId === item.id ? 'true' : 'false',
+              disabled: saving,
+              title: t('panel.removeKey'),
+              'aria-label': `${t('panel.removeKey')} ${itemLabel(item)}`,
+              onClick: () => { void deleteKey(item.id) },
+            }, deletingId === item.id ? t('panel.removeConfirm') : '×'))),
             h('button', {
               type: 'button',
               className: 'ocg-menu-item ocg-menu-add',
@@ -1110,7 +1188,7 @@ window.__ModuleLoader__.load({
                 'aria-expanded': menuOpen,
                 'aria-label': t('panel.keys'),
                 disabled: saving,
-                onClick: () => { setMenuOpen((open) => !open) },
+                onClick: () => { setMenuOpen((open) => !open); setDeletingId(null) },
               }, h('span', { className: 'ocg-caret', 'data-open': menuOpen ? 'true' : 'false' }))
               : null,
             keyInfo?.activeId !== null && keyInfo?.activeId !== undefined

@@ -64,7 +64,7 @@ const findAll = (node, predicate, out = []) => { walk(node, (candidate) => { if 
 /**
  * Render one state. `useStateAt` overrides the initial value of a hook slot:
  * 0 snapshot, 1 expanded, 3 key info, 9 placement, 10 label draft, 11 key menu,
- * 12 hover tooltip (13 is the countdown clock).
+ * 12 hover tooltip, 13 armed delete (14 is the countdown clock).
  */
 function render({ useStateAt = {}, lastGood } = {}) {
   let stateIndex = 0
@@ -181,9 +181,18 @@ check('the footer offers a picker toggle',
   findAll(keyList.card, (node) => node.props?.['aria-label'] === '已保存的 Key').length >= 1)
 
 const keyMenu = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: twoKeys, 9: placement, 11: true } })
-const menuItems = findAll(keyMenu.card, (node) => String(node.props?.className ?? '').includes('ocg-menu-item'))
-check('the picker lists every key', menuItems.length === 3, `${menuItems.length} items`)
-check('the active key is marked', menuItems.filter((node) => node.props['aria-selected'] === true).length === 1)
+const menuRows = findAll(keyMenu.card, (node) => node.props?.className === 'ocg-menu-row')
+check('the picker lists every key', menuRows.length === 2, `${menuRows.length} rows`)
+check('the active key is marked', menuRows.filter((node) => node.props['aria-selected'] === true).length === 1)
+const removeButtons = findAll(keyMenu.card, (node) => node.props?.className === 'ocg-menu-del')
+check('every listed key can be removed', removeButtons.length === 2, `${removeButtons.length} buttons`)
+check('removal is labelled for assistive tech',
+  removeButtons.every((node) => typeof node.props['aria-label'] === 'string' && node.props['aria-label'].includes('删除')))
+check('removal needs a second press', removeButtons.every((node) => node.props['data-armed'] === 'false' && node.children?.[0] === '×'))
+
+const armed = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: twoKeys, 9: placement, 11: true, 13: 'key-1' } })
+const armedButton = findAll(armed.card, (node) => node.props?.['data-armed'] === 'true')
+check('the armed button asks for confirmation', armedButton.length === 1 && textOf(armedButton[0]).includes('确认'))
 check('the picker offers adding a key', textOf(keyMenu.card).includes('添加新 Key'))
 check('each entry shows its mask', textOf(keyMenu.card).includes('Personal') && textOf(keyMenu.card).includes('second…3210'))
 

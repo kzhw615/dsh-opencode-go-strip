@@ -53,9 +53,12 @@ The key never has to be typed into a config file. Resolution order, first hit wi
 
 Save more than one key with an optional label and switch between them from the picker
 next to the mask. Only one account is queried at a time, because the endpoint reports a
-single account's windows and deliberately does not combine keys. Clear removes just the
-active key. A key saved by an earlier single-key version of this plugin is adopted
-automatically and left in place on disk.
+single account's windows and deliberately does not combine keys.
+
+Removing a key takes two presses: hover a row in the picker and press `×` (it turns into
+*Delete?*), or select the key and use **Clear** in the footer — both remove only that one
+key, and the first remaining key becomes active. A key saved by an earlier single-key
+version of this plugin is adopted automatically and left in place on disk.
 
 With no key anywhere, the strip reads *No API key · click to set* and the popover
 opens the input form directly.
@@ -142,8 +145,11 @@ DSH（DeepSeek Harness）的 OpenCode Go 额度插件：输入框下方一条细
 ### 多个 Key
 
 可以保存多个 Key（带可选标签），在浮层的下拉里切换。一次只查询一个账号——接口只返回
-单个账号的额度，且明确说明不同 Key 的额度不能相加。清除只删当前这个 Key；旧版单 Key
-记录会被自动接管，不会删除原文件。
+单个账号的额度，且明确说明不同 Key 的额度不能相加。
+
+删除要按两下：鼠标移到某一行按 `×`（会变成「确认？」），或先选中它再按底部的「清除」。
+两种方式都只删那一个 Key，剩下的第一个会自动成为当前。旧版单 Key 记录会被自动接管，
+不会删除原文件。
 
 ### 细条悬停
 
