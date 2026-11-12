@@ -274,6 +274,8 @@ window.__ModuleLoader__.load({
   margin-top: 6px;
 }
 .ocg-pop-head {
+  min-width: 0;
+  flex-wrap: nowrap;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -285,8 +287,10 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-label-secondary);
 }
 .ocg-pop-title {
+  flex: 0 0 auto;
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xs-strong-13, 500 13px/20px var(--dsw-font-family, inherit));
+  white-space: nowrap;
 }
 .ocg-foot {
   display: flex;
@@ -454,6 +458,9 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-state-error-primary);
 }
 .ocg-pop-stamp {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
   white-space: nowrap;
 }
@@ -1193,11 +1200,9 @@ window.__ModuleLoader__.load({
           h('rect', { x: 11.3, y: 3, width: 3.2, height: 10.5, rx: 1, fill: 'currentColor' })),
           h('span', { className: 'ocg-pop-title' }, t('panel.title')),
           h('span', { className: 'ocg-spacer' }),
-          typeof good?.fetchedAt === 'string'
-            ? h('span', { className: 'ocg-pop-stamp' },
-              t('panel.updated', { time: formatClock(good.fetchedAt) }),
-              typeof update?.current === 'string' ? ` · v${update.current}` : '')
-            : null,
+          // One slot on the right: a release notice when there is one, otherwise the
+          // update stamp. The running version only lives in the stamp's tooltip so
+          // the title never has to wrap.
           update?.available === true
             ? h('button', {
               type: 'button',
@@ -1208,8 +1213,17 @@ window.__ModuleLoader__.load({
                 ? t('update.starting')
                 : update.failed === true ? t('update.failed') : t('update.available', { version: update.latest }),
               onClick: () => { void applyUpdate() },
-            }, update.started === true ? t('update.starting') : `${t('update.apply')} ${update.latest}`)
-            : null,
+            }, update.started === true
+              ? t('update.starting')
+              : `${t('update.apply')} ${update.latest}`)
+            : typeof good?.fetchedAt === 'string'
+              ? h('span', {
+                className: 'ocg-pop-stamp',
+                title: typeof update?.current === 'string'
+                  ? `${t('panel.updated', { time: formatClock(good.fetchedAt) })} · v${update.current}`
+                  : undefined,
+              }, t('panel.updated', { time: formatClock(good.fetchedAt) }))
+              : null,
           h('button', {
             type: 'button',
             className: 'ocg-icon-btn',

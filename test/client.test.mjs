@@ -208,13 +208,16 @@ check('the tooltip is a tooltip for assistive tech', tip?.props?.role === 'toolt
 // ---- release channel --------------------------------------------------------
 const upToDate = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: storedKey, 9: placement, 14: { current: '1.0.0', latest: '1.0.0', available: false, canApply: false, reason: 'current' } } })
 check('an up-to-date copy shows no update control', findAll(upToDate.card, (node) => node.props?.className === 'ocg-update').length === 0)
-check('the running version is shown', textOf(upToDate.card).includes('v1.0.0'), textOf(upToDate.card).slice(0, 90))
+const stamp = findAll(upToDate.card, (node) => node.props?.className === 'ocg-pop-stamp')[0]
+check('the running version is in the stamp tooltip', typeof stamp?.props?.title === 'string' && stamp.props.title.includes('v1.0.0'), String(stamp?.props?.title))
+check('the stamp itself stays short', textOf(stamp) === '更新于 10:31' || /^更新于 \d/.test(textOf(stamp)), textOf(stamp))
 
 const offered = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: storedKey, 9: placement, 14: { current: '1.0.0', latest: '1.2.0', available: true, canApply: true, reason: 'ready', spec: 'git+https://example.invalid#abc' } } })
 const updateButton = findAll(offered.card, (node) => node.props?.className === 'ocg-update')[0]
 check('a newer release offers an update control', updateButton !== undefined)
 check('the control names the version', textOf(updateButton).includes('1.2.0'), textOf(updateButton))
 check('the control explains itself', typeof updateButton?.props?.title === 'string' && updateButton.props.title.includes('1.2.0'))
+check('the release notice replaces the stamp', findAll(offered.card, (node) => node.props?.className === 'ocg-pop-stamp').length === 0)
 
 const starting = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: storedKey, 9: placement, 14: { current: '1.0.0', latest: '1.2.0', available: true, canApply: true, started: true } } })
 const busyButton = findAll(starting.card, (node) => node.props?.className === 'ocg-update')[0]
