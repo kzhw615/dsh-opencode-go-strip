@@ -63,7 +63,8 @@ const findAll = (node, predicate, out = []) => { walk(node, (candidate) => { if 
 
 /**
  * Render one state. `useStateAt` overrides the initial value of a hook slot:
- * 0 snapshot, 1 expanded, 3 key info, 9 placement (10 is the countdown clock).
+ * 0 snapshot, 1 expanded, 3 key info, 9 placement, 10 label draft, 11 key menu,
+ * 12 hover tooltip (13 is the countdown clock).
  */
 function render({ useStateAt = {}, lastGood } = {}) {
   let stateIndex = 0
@@ -99,7 +100,25 @@ function render({ useStateAt = {}, lastGood } = {}) {
   return { slot, options, element, card }
 }
 
-const storedKey = { configured: true, source: 'stored', masked: 'oc_s…bals', writable: true, memoryOnly: true }
+const storedKey = {
+  configured: true,
+  source: 'stored',
+  masked: 'oc_s…bals',
+  writable: true,
+  memoryOnly: true,
+  activeId: 'key-1',
+  items: [{ id: 'key-1', label: 'Key 1', masked: 'oc_s…bals' }],
+  fallback: null,
+}
+const twoKeys = {
+  ...storedKey,
+  activeId: 'key-2',
+  masked: 'second…3210',
+  items: [
+    { id: 'key-1', label: 'Personal', masked: 'oc_s…bals' },
+    { id: 'key-2', label: 'Work', masked: 'second…3210' },
+  ],
+}
 const iso = (ms) => new Date(Date.now() + ms).toISOString()
 const readyValue = {
   windows: [
@@ -153,6 +172,29 @@ check('a failed poll is marked', textOf(stale.card).includes('上次刷新失败
 const partial = render({ useStateAt: { 0: { status: 'ready', value: { windows: [{ id: 'weekly', percent: 44, status: 'rate-limited', resetsAt: null }], fetchedAt: new Date().toISOString() } }, 1: true, 3: storedKey, 9: placement } })
 check('a missing window is labelled', textOf(partial.card).includes('未返回数据'))
 check('a non-ok window status is surfaced', textOf(partial.card).includes('已限流'))
+
+// ---- several keys -----------------------------------------------------------
+const keyList = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: twoKeys, 9: placement } })
+check('the active key label is shown', textOf(keyList.card).includes('Work'), textOf(keyList.card).slice(0, 120))
+check('the picker is closed by default', findAll(keyList.card, (node) => node.props?.className === 'ocg-menu').length === 0)
+check('the footer offers a picker toggle',
+  findAll(keyList.card, (node) => node.props?.['aria-label'] === '已保存的 Key').length >= 1)
+
+const keyMenu = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: twoKeys, 9: placement, 11: true } })
+const menuItems = findAll(keyMenu.card, (node) => String(node.props?.className ?? '').includes('ocg-menu-item'))
+check('the picker lists every key', menuItems.length === 3, `${menuItems.length} items`)
+check('the active key is marked', menuItems.filter((node) => node.props['aria-selected'] === true).length === 1)
+check('the picker offers adding a key', textOf(keyMenu.card).includes('添加新 Key'))
+check('each entry shows its mask', textOf(keyMenu.card).includes('Personal') && textOf(keyMenu.card).includes('second…3210'))
+
+// ---- hover tooltip ----------------------------------------------------------
+const hovered = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 12: { id: 'weekly', left: 80, bottom: 240, width: 210 } } })
+const tip = findAll(hovered.element, (node) => node.props?.className === 'ocg-tip')[0]
+check('hovering a window opens a tooltip', tip !== undefined)
+check('the tooltip names the window', textOf(tip).includes('本周'), textOf(tip))
+check('the tooltip shows used and remaining', textOf(tip).includes('已用') && textOf(tip).includes('剩余'))
+check('the tooltip is anchored above the strip', tip?.props?.style?.bottom === 240 && tip?.props?.style?.position === 'fixed')
+check('the tooltip is a tooltip for assistive tech', tip?.props?.role === 'tooltip')
 
 if (failures.length > 0) {
   console.error(`${failures.length} client check(s) failed:`)

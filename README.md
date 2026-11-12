@@ -11,9 +11,10 @@ a compact strip under the composer, and a popover with per-window rings.
 
 - **Strip** (below the composer, always visible while a session is open): a status
   dot, the `OpenCode Go` label, and one ring per plan window with its used percentage.
+  Hovering a window shows its used/remaining split and reset countdown in place.
 - **Popover** (click the strip): the title, one row per window with a ring, the used
-  percentage and the reset countdown, plus the API-key controls. Click outside or
-  press <kbd>Esc</kbd> to close.
+  percentage and the reset countdown, plus the API-key controls and a picker for
+  saved keys. Click outside or press <kbd>Esc</kbd> to close.
 - Rings follow the host's own quota meter: a faint track is what is left, the arc is
   what is used, and the arc turns amber/red at 70%/90%.
 
@@ -38,15 +39,23 @@ The three windows come from the OpenCode Go plan: rolling 5-hour, weekly, monthl
 
 The key never has to be typed into a config file. Resolution order, first hit wins:
 
-1. The credential record this plugin stores when you save a key in the popover
-   (`opencode-go-usage/api-key`). Tick **This session only (not written to disk)** to
-   keep it in the Host process memory instead — it then disappears when the plugin
-   unloads or DSH restarts.
+1. The **active saved key** — the one selected in the popover, stored in the credential
+   record `opencode-go-usage/keys`. Tick **This session only (not written to disk)** to
+   keep a key in the Host process memory instead; it then disappears when the plugin
+   unloads or DSH restarts, and it is offered in the picker as *This session*.
 2. `OPENCODE_GO_API_KEY`, then `OPENCODE_ZEN_GO_API_KEY`, then `OPENCODE_API_KEY`.
 3. The local OpenCode `auth.json` — `$XDG_DATA_HOME/opencode/auth.json`, its
    `~/.local/share/opencode/auth.json` default, or `~/.config/opencode/auth.json` —
    reading the `opencode-go` entry. `OPENCODE_AUTH_CONTENT`, when set, is read instead
    of a file.
+
+### Several keys
+
+Save more than one key with an optional label and switch between them from the picker
+next to the mask. Only one account is queried at a time, because the endpoint reports a
+single account's windows and deliberately does not combine keys. Clear removes just the
+active key. A key saved by an earlier single-key version of this plugin is adopted
+automatically and left in place on disk.
 
 With no key anywhere, the strip reads *No API key · click to set* and the popover
 opens the input form directly.
@@ -129,6 +138,16 @@ DSH（DeepSeek Harness）的 OpenCode Go 额度插件：输入框下方一条细
 `OPENCODE_API_KEY` → 本地 OpenCode 的 `auth.json`（`opencode-go` 条目）。
 
 在浮层里粘贴 Key 即可保存；勾选「仅本次会话使用（不写入磁盘）」则只留在内存里。
+
+### 多个 Key
+
+可以保存多个 Key（带可选标签），在浮层的下拉里切换。一次只查询一个账号——接口只返回
+单个账号的额度，且明确说明不同 Key 的额度不能相加。清除只删当前这个 Key；旧版单 Key
+记录会被自动接管，不会删除原文件。
+
+### 细条悬停
+
+鼠标停在细条里某个窗口上，会在它上方显示该窗口的已用/剩余比例和重置倒计时，不用打开浮层。
 
 ### 安全
 

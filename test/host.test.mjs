@@ -14,7 +14,11 @@ function check(name, ok, detail) {
   if (!ok) failures.push(`${name}${detail === undefined ? '' : ` — ${detail}`}`)
 }
 
+const KEYS = 'opencode-go-usage/keys'
+const LEGACY = 'opencode-go-usage/api-key'
 const SECRET = 'test-key-0123456789'
+const SECOND = 'second-key-9876543210'
+
 const usageBody = {
   usage: {
     rolling: { status: 'ok', percent: 11.4, resetsAt: '2026-11-11T18:10:09.580Z' },
@@ -34,17 +38,31 @@ const fakeFetch = async () => {
   return new Response(JSON.stringify(usageBody), { status: 200 })
 }
 
+/** An in-memory credential store that speaks both api-key and grant records. */
+function makeStore() {
+  const records = new Map()
+  return {
+    records,
+    async readRecord(key) { return records.get(key) },
+    async describeRecord() { return { configured: true, writable: true } },
+    async modifyRecord(key, mutate) {
+      const next = await mutate(records.get(key))
+      if (next === undefined) records.delete(key)
+      else records.set(key, next)
+      return next
+    },
+    async deleteRecord(key) { records.delete(key) },
+  }
+}
+const savedItems = (store) => store.records.get(KEYS)?.payload?.items ?? []
+
 function makeHost({ credentials, admit = () => ({ peer: {} }), fetchImpl = fakeFetch } = {}) {
   const registered = []
   const ctx = {
     logger: { warn() {}, info() {}, error() {} },
     get(name) {
       if (name === 'webServer') {
-        return {
-          protocol: 'http:',
-          port: 0,
-          register(route) { registered.push(route); return () => {} },
-        }
+        return { protocol: 'http:', port: 0, register(route) { registered.push(route); return () => {} } }
       }
       if (name === 'connection') return { admit }
       if (name === 'credentials') return credentials
@@ -62,7 +80,6 @@ function makeHost({ credentials, admit = () => ({ peer: {} }), fetchImpl = fakeF
   return { route: registered[0] }
 }
 
-/** Call the registered node:http handler. */
 async function call(host, path, { method = 'POST', body = '{}' } = {}) {
   const response = { status: 0, headers: {}, body: '' }
   const res = {
@@ -101,7 +118,7 @@ check('oversized body rejected', (await call(host, '/opencode-go-usage/usage', {
 const usage = await call(host, '/opencode-go-usage/usage')
 check('usage answered', usage.status === 200 && usage.json?.ok === true, usage.body.slice(0, 120))
 check('three windows in order', usage.json?.value?.windows?.map((w) => w.id).join(',') === 'rolling,weekly,monthly')
-check('percent is clamped and kept', usage.json?.value?.windows?.[2]?.percent === 93.2)
+check('percent is preserved', usage.json?.value?.windows?.[2]?.percent === 93.2)
 check('the key never appears in the payload', !usage.body.includes(SECRET))
 check('responses are no-store', usage.headers['cache-control'] === 'no-store')
 
@@ -132,43 +149,63 @@ check('windows[] variant accepted', (await call(arrayHost, '/opencode-go-usage/u
 check('unknown endpoint reported', (await call(host, '/opencode-go-usage/nope')).json?.error?.code === 'unknown-endpoint')
 check('a path outside the channel has no endpoint', (await call(host, '/elsewhere/usage')).json?.error?.code === 'unknown-endpoint')
 
-// ---- stored credential beats the environment --------------------------------
+// ---- saved keys beat the environment ---------------------------------------
 delete process.env.OPENCODE_GO_API_KEY
-let stored
-const store = {
-  async readRecord() { return stored === undefined ? undefined : { kind: 'api-key', key: stored } },
-  async describeRecord() { return { configured: stored !== undefined, writable: true } },
-  async modifyRecord(_key, mutate) { const next = await mutate(undefined); stored = next.key; return next },
-  async deleteRecord() { stored = undefined },
-}
+const store = makeStore()
 const storeHost = makeHost({ credentials: store })
 check('missing key reported', (await call(storeHost, '/opencode-go-usage/usage')).json?.error?.code === 'no-key')
 
-const saved = await call(storeHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: `  ${SECRET}  ` }) })
-check('setKey trims and stores', saved.json?.ok === true && stored === SECRET)
-check('setKey masks the value', typeof saved.json?.value?.masked === 'string' && !saved.json.value.masked.includes(SECRET))
+const first = await call(storeHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: `  ${SECRET}  ` }) })
+check('setKey trims and stores', first.json?.ok === true && savedItems(store)[0]?.key === SECRET)
+check('setKey masks the value', typeof first.json?.value?.masked === 'string' && !first.json.value.masked.includes(SECRET))
+check('the first key becomes active', first.json?.value?.activeId === savedItems(store)[0]?.id)
 check('empty key rejected', (await call(storeHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: '  ' }) })).json?.error?.code === 'invalid-key')
-
-const described = await call(storeHost, '/opencode-go-usage/key')
-check('key endpoint reports the stored source', described.json?.value?.source === 'stored' && described.json?.value?.configured === true)
-check('key endpoint never returns the key', !described.body.includes(SECRET))
-check('key endpoint advertises the session-only path', described.json?.value?.memoryOnly === true)
 check('quota works after saving a key', (await call(storeHost, '/opencode-go-usage/usage')).json?.value?.keySource === 'stored')
 
+// ---- several keys, one active ----------------------------------------------
+const second = await call(storeHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: SECOND, label: 'Work' }) })
+check('a second key is appended', savedItems(store).length === 2 && savedItems(store)[1].label === 'Work')
+check('the newest key becomes active', second.json?.value?.activeId === savedItems(store)[1].id)
+check('both keys are listed', second.json?.value?.items?.length === 2)
+check('every listed key is masked', second.json?.value?.items?.every((item) => typeof item.masked === 'string' && !item.masked.includes(SECRET) && !item.masked.includes(SECOND)))
+
+const firstId = savedItems(store)[0].id
+const secondId = savedItems(store)[1].id
+const switched = await call(storeHost, '/opencode-go-usage/selectKey', { body: JSON.stringify({ id: firstId }) })
+check('selectKey switches the active key', switched.json?.value?.activeId === firstId)
+check('the switch is persisted', store.records.get(KEYS).payload.active === firstId)
+check('selecting an unknown key is refused', (await call(storeHost, '/opencode-go-usage/selectKey', { body: JSON.stringify({ id: 'nope' }) })).json?.error?.code === 'unknown-key')
+
+const replaced = await call(storeHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ id: secondId, key: `${SECOND}-rotated`, label: 'Work 2' }) })
+check('editing a saved key replaces it in place', savedItems(store).length === 2 && savedItems(store)[1].key === `${SECOND}-rotated`)
+check('editing keeps the label update', savedItems(store)[1].label === 'Work 2' && replaced.json?.value?.activeId === secondId)
+
+const removed = await call(storeHost, '/opencode-go-usage/clearKey', { body: JSON.stringify({ id: secondId }) })
+check('clearKey removes only that key', savedItems(store).length === 1 && removed.json?.ok === true)
+check('the remaining key becomes active', removed.json?.value?.activeId === firstId)
+
 // ---- session-only key -------------------------------------------------------
-let stored2
-const memoryStore = {
-  async readRecord() { return stored2 === undefined ? undefined : { kind: 'api-key', key: stored2 } },
-  async describeRecord() { return { configured: stored2 !== undefined, writable: true } },
-  async modifyRecord(_key, mutate) { const next = await mutate(undefined); stored2 = next.key; return next },
-  async deleteRecord() { stored2 = undefined },
-}
+const memoryStore = makeStore()
 const memoryHost = makeHost({ credentials: memoryStore })
 const memorySave = await call(memoryHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: SECRET, persist: false }) })
 check('session-only save reports the memory source', memorySave.json?.value?.source === 'memory')
-check('session-only save writes nothing', stored2 === undefined)
+check('session-only save writes nothing', memoryStore.records.get(KEYS) === undefined)
+check('the session key is listed', memorySave.json?.value?.items?.[0]?.id === 'session')
+check('the session key is active', memorySave.json?.value?.activeId === 'session')
 check('session-only key is used for queries', (await call(memoryHost, '/opencode-go-usage/usage')).json?.value?.keySource === 'memory')
-check('clear removes it', (await call(memoryHost, '/opencode-go-usage/clearKey')).json?.ok === true)
+
+await call(memoryHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: SECOND }) })
+check('saving a stored key drops the session one', (await call(memoryHost, '/opencode-go-usage/key')).json?.value?.source === 'stored')
+
+// a session key coexists with a stored one and can be switched back to
+const bothHost = makeHost({ credentials: makeStore() })
+await call(bothHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: SECOND }) })
+const withSession = await call(bothHost, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: SECRET, persist: false }) })
+check('a session key is listed alongside stored keys', withSession.json?.value?.items?.length === 2)
+check('the session key wins while it exists', withSession.json?.value?.source === 'memory')
+check('selecting the stored key clears the session one',
+  (await call(bothHost, '/opencode-go-usage/selectKey', { body: JSON.stringify({ id: withSession.json.value.items[1].id }) })).json?.value?.source === 'stored')
+check('clearing everything leaves no key', (await call(bothHost, '/opencode-go-usage/clearKey')).json?.value?.configured === false)
 
 // ---- auth.json fallback -----------------------------------------------------
 const authDir = join(process.env.XDG_DATA_HOME, 'opencode')
@@ -177,12 +214,28 @@ await writeFile(join(authDir, 'auth.json'), JSON.stringify({ 'opencode-go': { ty
 const fileHost = makeHost()
 const fromFile = await call(fileHost, '/opencode-go-usage/usage')
 check('auth.json fallback works', fromFile.json?.ok === true && String(fromFile.json?.value?.keySource).endsWith('auth.json'))
+check('auth.json keys are reported as a fallback, not a saved item',
+  (await call(fileHost, '/opencode-go-usage/key')).json?.value?.fallback !== null)
+await rm(join(authDir, 'auth.json'), { force: true })
+
+// ---- keys saved by the previous single-key version --------------------------
+const legacyStore = makeStore()
+legacyStore.records.set(LEGACY, { kind: 'api-key', key: SECRET })
+const legacyHost = makeHost({ credentials: legacyStore })
+const legacyKey = await call(legacyHost, '/opencode-go-usage/key')
+check('a legacy api-key record is adopted', legacyKey.json?.value?.configured === true && legacyKey.json?.value?.source === 'stored')
+check('the adopted key is selectable', legacyKey.json?.value?.items?.[0]?.id === 'saved')
+check('the legacy record is left untouched', legacyStore.records.get(LEGACY)?.key === SECRET)
+const migrated = await call(legacyHost, '/opencode-go-usage/selectKey', { body: JSON.stringify({ id: 'saved' }) })
+check('selecting it migrates to the new record', savedItems(legacyStore).length === 1 && migrated.json?.ok === true)
 
 // ---- profile without a credential store -------------------------------------
 const bare = makeHost()
 const bareKey = await call(bare, '/opencode-go-usage/key')
 check('a store-less profile reports writable=false', bareKey.json?.value?.writable === false)
 check('...but still allows a session-only key', bareKey.json?.value?.memoryOnly === true)
+check('...and saving to the store fails cleanly',
+  (await call(bare, '/opencode-go-usage/setKey', { body: JSON.stringify({ key: SECRET }) })).json?.error?.code === 'no-credential-store')
 
 await rm(home, { recursive: true, force: true })
 
@@ -191,4 +244,4 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`  - ${failure}`)
   process.exit(1)
 }
-console.log('host: route, cache, error mapping, key sources — all checks passed')
+console.log('host: route, cache, error mapping, key list — all checks passed')

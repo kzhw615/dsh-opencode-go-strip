@@ -36,6 +36,25 @@ const missing = [...used].filter((name) => !new RegExp(`\\n\\.${name} \\{`).test
 check('every rendered class has a base style rule', missing.length === 0, missing.join(', '))
 check('stylesheet braces balance', (css.match(/\{/g) ?? []).length === (css.match(/\}/g) ?? []).length)
 
+// --------------------------------------------------------------- i18n
+// Both dictionaries must cover the same keys, and every literal lookup must
+// exist in them: a missing key renders its own name on screen.
+const grabDictionary = (marker) => {
+  const from = client.indexOf(marker)
+  const to = client.indexOf('\n    }', from)
+  return new Set([...client.slice(from, to).matchAll(/'([a-z][a-zA-Z0-9.-]*)':/g)].map((m) => m[1]))
+}
+const en = grabDictionary('const EN = {')
+const zh = grabDictionary('const ZH = {')
+check('both dictionaries are non-trivial', en.size > 40 && zh.size > 40, `${en.size}/${zh.size}`)
+check('dictionaries cover the same keys', en.size === zh.size && [...en].every((key) => zh.has(key)),
+  [...en].filter((key) => !zh.has(key)).join(', '))
+const lookups = new Set([...client.matchAll(/\bt\('([a-z][^']*)'/g)].map((m) => m[1]))
+const unknownLookups = [...lookups].filter((key) => !en.has(key) && !key.startsWith('window.short.'))
+check('every literal translation lookup exists', unknownLookups.length === 0, unknownLookups.join(', '))
+const shortLookups = [...lookups].filter((key) => key.startsWith('window.short.'))
+check('window.short keys exist', shortLookups.every((key) => en.has(key)), shortLookups.join(', '))
+
 // ------------------------------------------------------------ design system
 check('no literal colours in the stylesheet', (css.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length === 0)
 check('no literal font sizes', (css.match(/font-size: \d+px/g) ?? []).length === 0)
@@ -58,6 +77,12 @@ check('polling pauses on a hidden page', client.includes('document.hidden'))
 check('the countdown clock stops while collapsed', client.includes('useClock(expanded ? CLOCK_MS : 0)'))
 check('placement is throttled to one frame', client.includes('requestAnimationFrame'))
 check('a session-only key survives a missing store', client.includes('forceMemory') && host.includes('memoryOnly: true'))
+check('several keys live in one grant record', host.includes("kind: 'grant'") && host.includes('KEYS_RECORD'))
+check('the previous single-key record is still read', host.includes('LEGACY_KEY_RECORD'))
+check('switching keys invalidates the cache', host.includes('async function selectKey') && /async function selectKey[\s\S]{0,400}resetCache\(\)/.test(host))
+check('the active key is the only one cleared', client.includes("callHost('clearKey', keyInfo?.activeId"))
+check('the strip shows a hover tooltip', client.includes("className: 'ocg-tip'") && client.includes('onPointerEnter'))
+check('the tooltip is dismissed when the strip moves', client.includes("window.addEventListener('scroll', clear, true)"))
 check('a non-JSON body is reported as a payload problem', host.includes("fail('unexpected-payload', 'The OpenCode Go usage response was not JSON.')"))
 
 if (failures.length > 0) {

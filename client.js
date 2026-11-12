@@ -53,6 +53,10 @@ window.__ModuleLoader__.load({
       'panel.keyFromFile': 'from {name}',
       'panel.keyMissing': 'Not configured',
       'panel.setKey': 'Set key',
+      'panel.keys': 'Saved keys',
+      'panel.addKey': 'Add another key',
+      'panel.thisSession': 'This session',
+      'panel.keyLabel': 'Label (optional)',
       'panel.changeKey': 'Change key',
       'panel.changeShort': 'Change',
       'panel.clearKey': 'Clear',
@@ -111,6 +115,10 @@ window.__ModuleLoader__.load({
       'panel.keyFromFile': '来自 {name}',
       'panel.keyMissing': '未配置',
       'panel.setKey': '设置 Key',
+      'panel.keys': '已保存的 Key',
+      'panel.addKey': '添加新 Key',
+      'panel.thisSession': '本次会话',
+      'panel.keyLabel': '标签（可选）',
       'panel.changeKey': '更换 Key',
       'panel.changeShort': '更换',
       'panel.clearKey': '清除',
@@ -251,6 +259,93 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xs-strong-13, 500 13px/20px var(--dsw-font-family, inherit));
 }
+.ocg-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ocg-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 168px;
+  overflow: auto;
+  padding: 4px;
+  margin: 0 -4px;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-layer-1));
+  border: 1px solid var(--dsw-alias-border-l1);
+}
+.ocg-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-xs, 4px);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ocg-menu-item:hover { background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-layer-2)); }
+.ocg-menu-item[aria-selected="true"] { color: var(--dsw-alias-label-primary); }
+.ocg-menu-item:disabled { opacity: 0.6; cursor: default; }
+.ocg-menu-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
+}
+.ocg-menu-dot[data-on="true"] {
+  background: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-label-primary);
+}
+.ocg-menu-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ocg-menu-add { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); }
+.ocg-key-name { color: var(--dsw-alias-label-secondary); }
+.ocg-btn-icon { padding: 2px 6px; }
+.ocg-caret {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  transition: transform 120ms ease;
+}
+.ocg-caret[data-open="true"] { transform: rotate(180deg); }
+.ocg-input-label { max-width: 34%; }
+.ocg-tip {
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: var(--dsw-radius-sm, 8px);
+  background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-layer-2));
+  border: 1px solid var(--dsw-alias-border-l1);
+  box-shadow: 0 6px 18px var(--dsw-alias-bg-mask-2);
+  color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
+  font: var(--dsw-font-xxs-12, 12px/18px var(--dsw-font-family, inherit));
+  pointer-events: none;
+  white-space: nowrap;
+}
+.ocg-tip-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ocg-tip-name { color: var(--dsw-alias-label-primary); }
 .ocg-pop-stamp {
   color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
   white-space: nowrap;
@@ -586,6 +681,9 @@ window.__ModuleLoader__.load({
         const [saving, setSaving] = React.useState(false)
         const [memoryOnly, setMemoryOnly] = React.useState(false)
         const [placement, setPlacement] = React.useState(null)
+        const [labelDraft, setLabelDraft] = React.useState('')
+        const [menuOpen, setMenuOpen] = React.useState(false)
+        const [tip, setTip] = React.useState(null)
         // Declared after `expanded` so the paused-clock read is initialised.
         const now = useClock(expanded ? CLOCK_MS : 0)
         const lastGoodRef = React.useRef(undefined)
@@ -741,6 +839,10 @@ window.__ModuleLoader__.load({
         // No credential store in this profile: keep the form, force memory-only.
         const forceMemory = keyInfo !== null && keyInfo.writable === false
         const sourceLabel = keySourceLabel(t, keyInfo)
+        const keyItems = Array.isArray(keyInfo?.items) ? keyInfo.items : []
+        const activeItem = keyItems.find((item) => item.id === keyInfo?.activeId)
+        const itemLabel = (item) => (item.id === 'session' ? t('panel.thisSession') : item.label)
+        const activeLabel = activeItem === undefined ? '' : itemLabel(activeItem)
 
         const saveKey = async (event) => {
           event.preventDefault()
@@ -752,9 +854,13 @@ window.__ModuleLoader__.load({
           setSaving(true)
           setSaveError(null)
           try {
-            const info = await callHost('setKey', { key: value, persist: !memoryOnly && !forceMemory })
+            const payload = { key: value, persist: !memoryOnly && !forceMemory }
+            if (labelDraft.trim() !== '') payload.label = labelDraft.trim()
+            if (activeItem !== undefined) payload.id = activeItem.id
+            const info = await callHost('setKey', payload)
             setKeyInfo(info)
             setDraft('')
+            setLabelDraft('')
             setEditingKey(false)
             refreshRef.current()
           } catch (error) {
@@ -768,9 +874,25 @@ window.__ModuleLoader__.load({
           setSaving(true)
           setSaveError(null)
           try {
-            const info = await callHost('clearKey', {})
+            const info = await callHost('clearKey', keyInfo?.activeId ? { id: keyInfo.activeId } : {})
             setKeyInfo(info)
             setEditingKey(false)
+            setMenuOpen(false)
+            refreshRef.current()
+          } catch (error) {
+            setSaveError(error?.code ?? 'save-failed')
+          } finally {
+            setSaving(false)
+          }
+        }
+
+        const chooseKey = async (id) => {
+          setSaving(true)
+          setSaveError(null)
+          try {
+            const info = await callHost('selectKey', { id })
+            setKeyInfo(info)
+            setMenuOpen(false)
             refreshRef.current()
           } catch (error) {
             setSaveError(error?.code ?? 'save-failed')
@@ -791,6 +913,15 @@ window.__ModuleLoader__.load({
               placeholder: t('panel.keyPlaceholder'),
               value: draft,
               onChange: (event) => { setDraft(event.target.value) },
+            }),
+            h('input', {
+              className: 'ocg-input ocg-input-label',
+              type: 'text',
+              spellCheck: false,
+              'aria-label': t('panel.keyLabel'),
+              placeholder: t('panel.keyLabel'),
+              value: labelDraft,
+              onChange: (event) => { setLabelDraft(event.target.value) },
             }),
             h('button', { type: 'submit', className: 'ocg-btn', 'data-primary': 'true', disabled: saving },
               saving ? t('panel.saving') : t('panel.save')),
@@ -835,7 +966,18 @@ window.__ModuleLoader__.load({
           .map((item) => h('span', {
             className: 'ocg-window',
             key: item.id,
-            title: `${t(`window.${item.id}`)} · ${t('panel.used', { percent: percentile(item.percent) })} · ${t('panel.remaining', { percent: percentile(100 - item.percent) })}`,
+            onPointerEnter: (event) => {
+              if (expanded) return
+              const rect = event.currentTarget.getBoundingClientRect()
+              const width = 210
+              setTip({
+                id: item.id,
+                left: Math.min(Math.max(rect.left, 12), Math.max(12, window.innerWidth - width - 12)),
+                bottom: Math.max(12, window.innerHeight - rect.top + 6),
+                width,
+              })
+            },
+            onPointerLeave: () => { setTip(null) },
           },
           quotaRing(item.percent, 12),
           h('span', { className: 'ocg-hint' }, t(`window.short.${item.id}`)),
@@ -924,30 +1066,69 @@ window.__ModuleLoader__.load({
               status === undefined ? null : h('span', { className: 'ocg-pop-reset' }, ` · ${status}`))))
         })
 
-        const cardFoot = h('div', { className: 'ocg-pop-foot' },
-          h('span', { className: 'ocg-pop-key', title: keyInfo?.source === undefined || keyInfo?.source === null ? t('panel.keyDetail') : `${t('panel.keyDetail')} ${keyInfo.source}` },
+        const keyMenu = menuOpen && keyItems.length > 0
+          ? h('div', { className: 'ocg-menu', role: 'listbox', 'aria-label': t('panel.keys') },
+            ...keyItems.map((item) => h('button', {
+              type: 'button',
+              key: item.id,
+              className: 'ocg-menu-item',
+              role: 'option',
+              'aria-selected': item.id === keyInfo?.activeId,
+              disabled: saving,
+              onClick: () => { void chooseKey(item.id) },
+            },
+            h('span', { className: 'ocg-menu-dot', 'data-on': item.id === keyInfo?.activeId ? 'true' : 'false' }),
+            h('span', { className: 'ocg-menu-label' }, itemLabel(item)),
+            h('span', { className: 'ocg-mask' }, item.masked))),
+            h('button', {
+              type: 'button',
+              className: 'ocg-menu-item ocg-menu-add',
+              disabled: saving,
+              onClick: () => { setMenuOpen(false); setEditingKey(true); setSaveError(null) },
+            }, h('span', { className: 'ocg-menu-label' }, t('panel.addKey'))))
+          : null
+
+        const cardFoot = h('div', { className: 'ocg-foot' },
+          h('div', { className: 'ocg-pop-foot' },
+            h('span', {
+              className: 'ocg-pop-key',
+              title: keyInfo?.source === undefined || keyInfo?.source === null
+                ? t('panel.keyDetail')
+                : `${t('panel.keyDetail')} ${keyInfo.source}`,
+            },
             h('span', { className: 'ocg-hint' }, `${t('panel.key')}: `),
+            activeLabel === '' ? null : h('span', { className: 'ocg-key-name' }, `${activeLabel} `),
             h('span', { className: 'ocg-mask' }, keyInfo?.masked ?? t('panel.keyMissing')),
             sourceLabel === '' || keyInfo?.source === 'stored'
               ? null
               : h('span', { className: 'ocg-hint' }, ` · ${sourceLabel}`)),
-          h('span', { className: 'ocg-spacer' }),
-          keyInfo?.source === 'stored'
-            ? h('button', {
-              type: 'button',
-              className: 'ocg-btn',
-              disabled: saving,
-              onClick: () => { void clearKey() },
-            }, t('panel.clearKey'))
-            : null,
-          noKey
-            ? null
-            : h('button', {
-              type: 'button',
-              className: 'ocg-btn',
-              onClick: () => { setEditingKey((open) => !open); setSaveError(null) },
-            }, keyInfo?.configured === true ? t('panel.changeShort') : t('panel.setKey')),
-        )
+            h('span', { className: 'ocg-spacer' }),
+            keyItems.length > 0
+              ? h('button', {
+                type: 'button',
+                className: 'ocg-btn ocg-btn-icon',
+                'aria-expanded': menuOpen,
+                'aria-label': t('panel.keys'),
+                disabled: saving,
+                onClick: () => { setMenuOpen((open) => !open) },
+              }, h('span', { className: 'ocg-caret', 'data-open': menuOpen ? 'true' : 'false' }))
+              : null,
+            keyInfo?.activeId !== null && keyInfo?.activeId !== undefined
+              ? h('button', {
+                type: 'button',
+                className: 'ocg-btn',
+                disabled: saving,
+                onClick: () => { void clearKey() },
+              }, t('panel.clearKey'))
+              : null,
+            noKey
+              ? null
+              : h('button', {
+                type: 'button',
+                className: 'ocg-btn',
+                onClick: () => { setEditingKey((open) => !open); setSaveError(null) },
+              }, keyInfo?.configured === true ? t('panel.changeShort') : t('panel.setKey'))),
+          keyMenu)
 
         const cardProps = {
           ref: popRef,
@@ -973,6 +1154,36 @@ window.__ModuleLoader__.load({
           ? ReactDOM === null ? cardBody : ReactDOM.createPortal(cardBody, document.body)
           : null
 
+        const tipWindow = tip === null ? undefined : windows.find((item) => item.id === tip.id)
+        const tipTimer = resetLabel(t, tipWindow?.resetsAt, now)
+        const tipPanel = tip === null || tipWindow === undefined || expanded || ReactDOM === null
+          ? null
+          : ReactDOM.createPortal(
+            h('div', {
+              className: 'ocg-tip',
+              role: 'tooltip',
+              style: { position: 'fixed', left: tip.left, bottom: tip.bottom, width: tip.width },
+            },
+            h('div', { className: 'ocg-tip-row' },
+              h('span', { className: 'ocg-tip-name' }, t(`window.${tipWindow.id}`)),
+              h('span', null, `${percentile(tipWindow.percent)}%`)),
+            h('div', null, t('panel.used', { percent: percentile(tipWindow.percent) })),
+            h('div', null, t('panel.remaining', { percent: percentile(100 - tipWindow.percent) })),
+            tipTimer === undefined ? null : h('div', null, tipTimer)),
+            document.body)
+
+        React.useEffect(() => {
+          if (tip === null) return undefined
+          // The strip travels with the transcript: a left-behind tooltip would lie.
+          const clear = () => { setTip(null) }
+          window.addEventListener('scroll', clear, true)
+          window.addEventListener('resize', clear)
+          return () => {
+            window.removeEventListener('scroll', clear, true)
+            window.removeEventListener('resize', clear)
+          }
+        }, [tip === null])
+
         const onKeyDown = (event) => {
           if (event.key !== 'Escape') return
           if (editingKey) {
@@ -987,6 +1198,7 @@ window.__ModuleLoader__.load({
         return h('div', { className: 'ocg-root', 'data-expanded': expanded, onKeyDown, ref: rootRef },
           h('style', { dangerouslySetInnerHTML: { __html: CSS } }),
           summary,
+          tipPanel,
           panel,
         )
       }

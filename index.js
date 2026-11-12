@@ -16,7 +16,10 @@ import { join } from 'node:path'
 
 const API_URL = 'https://opencode.ai/zen/go/v1/usage'
 const CHANNEL = '/opencode-go-usage'
-const KEY_RECORD = 'opencode-go-usage/api-key'
+const KEYS_RECORD = 'opencode-go-usage/keys'
+const LEGACY_KEY_RECORD = 'opencode-go-usage/api-key'
+const SESSION_ID = 'session'
+const LEGACY_ITEM_ID = 'saved'
 const ENV_NAMES = ['OPENCODE_GO_API_KEY', 'OPENCODE_ZEN_GO_API_KEY', 'OPENCODE_API_KEY']
 const WINDOW_IDS = ['rolling', 'weekly', 'monthly']
 const SUCCESS_TTL_MS = 60_000
@@ -153,17 +156,103 @@ export function apply(ctx) {
     }
   }
 
-  async function storedKey() {
+  function credentialStore() {
     const credentials = ctx.get('credentials')
+    return credentials === undefined ? undefined : credentials
+  }
+
+  function resetCache() {
+    cache.result = undefined
+    cache.at = 0
+  }
+
+  /** The environment variable that currently supplies a key, if any. */
+  function envKey() {
+    for (const name of ENV_NAMES) {
+      const value = process.env[name]
+      if (typeof value === 'string' && value.trim() !== '') return { key: value.trim(), source: name }
+    }
+    return undefined
+  }
+
+  /** The single-key record written by earlier versions of this plugin. */
+  async function legacyKey() {
+    const credentials = credentialStore()
     if (credentials === undefined || typeof credentials.readRecord !== 'function') return undefined
     try {
-      const record = await credentials.readRecord(KEY_RECORD)
+      const record = await credentials.readRecord(LEGACY_KEY_RECORD)
       const value = record !== null && typeof record === 'object' ? record.key : undefined
       return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined
     } catch (error) {
-      logger('warn', 'opencode-go-usage: credential record read failed', error)
+      logger('warn', 'opencode-go-usage: legacy credential record read failed', error)
       return undefined
     }
+  }
+
+  /**
+   * Saved keys plus the active id. Both live in one grant record because the
+   * credential seam addresses an api-key record by a single value, while a list
+   * needs ids, labels and an active pointer that only this plugin understands.
+   */
+  async function readKeyState() {
+    const credentials = credentialStore()
+    const state = { stored: [], activeId: null, writable: false }
+    if (credentials === undefined) return state
+    if (typeof credentials.describeRecord === 'function') {
+      try {
+        state.writable = (await credentials.describeRecord(KEYS_RECORD))?.writable === true
+      } catch {
+        state.writable = false
+      }
+    }
+    if (typeof credentials.readRecord === 'function') {
+      try {
+        const record = await credentials.readRecord(KEYS_RECORD)
+        const payload = record !== null && typeof record === 'object' && record.kind === 'grant' ? record.payload : undefined
+        if (payload !== null && typeof payload === 'object' && Array.isArray(payload.items)) {
+          state.stored = payload.items
+            .filter((item) => item !== null && typeof item === 'object'
+              && typeof item.id === 'string' && item.id !== ''
+              && typeof item.key === 'string' && item.key.trim() !== '')
+            .map((item) => ({
+              id: item.id,
+              label: typeof item.label === 'string' && item.label !== '' ? item.label : item.id,
+              key: item.key,
+            }))
+          if (typeof payload.active === 'string' && state.stored.some((item) => item.id === payload.active)) {
+            state.activeId = payload.active
+          }
+        }
+      } catch (error) {
+        logger('warn', 'opencode-go-usage: credential record read failed', error)
+      }
+    }
+    if (state.stored.length === 0) {
+      // Adopt a key saved by an earlier version, without deleting it yet.
+      const legacy = await legacyKey()
+      if (legacy !== undefined) {
+        state.stored = [{ id: LEGACY_ITEM_ID, label: 'Saved key', key: legacy }]
+        state.activeId = LEGACY_ITEM_ID
+      }
+    }
+    if (state.activeId === null && state.stored.length > 0) state.activeId = state.stored[0].id
+    return state
+  }
+
+  /** Persist the list. Returns a failure code instead of throwing. */
+  async function writeKeyState(items, activeId) {
+    const credentials = credentialStore()
+    if (credentials === undefined || typeof credentials.modifyRecord !== 'function') return 'no-credential-store'
+    try {
+      await credentials.modifyRecord(KEYS_RECORD, async () => ({
+        kind: 'grant',
+        payload: { active: activeId, items: items.map(({ id, label, key }) => ({ id, label, key })) },
+      }))
+    } catch (error) {
+      logger('error', 'opencode-go-usage: could not save the key list', error)
+      return 'save-failed'
+    }
+    return undefined
   }
 
   async function authFileKey() {
@@ -197,38 +286,45 @@ export function apply(ctx) {
 
   async function resolveKey() {
     if (memoryKey !== undefined) return { key: memoryKey, source: 'memory' }
-    const record = await storedKey()
-    if (record !== undefined) return { key: record, source: 'stored' }
-    for (const name of ENV_NAMES) {
-      const value = process.env[name]
-      if (typeof value === 'string' && value.trim() !== '') return { key: value.trim(), source: name }
-    }
+    const state = await readKeyState()
+    const active = state.stored.find((item) => item.id === state.activeId)
+    if (active !== undefined) return { key: active.key, source: 'stored' }
+    const env = envKey()
+    if (env !== undefined) return env
     return authFileKey()
   }
 
   async function describeKey() {
-    const resolved = await resolveKey()
+    const state = await readKeyState()
+    const active = state.stored.find((item) => item.id === state.activeId)
+    const items = state.stored.map((item) => ({ id: item.id, label: item.label, masked: maskKey(item.key) }))
     if (memoryKey !== undefined) {
-      return { configured: true, source: 'memory', masked: maskKey(memoryKey), writable: true }
+      items.unshift({ id: SESSION_ID, label: 'This session', masked: maskKey(memoryKey) })
     }
-    const credentials = ctx.get('credentials')
-    let writable = false
-    if (credentials !== undefined && typeof credentials.describeRecord === 'function') {
-      try {
-        const info = await credentials.describeRecord(KEY_RECORD)
-        writable = info?.writable === true
-      } catch {
-        writable = false
+    let fallback = null
+    if (memoryKey === undefined && active === undefined) {
+      const env = envKey()
+      if (env !== undefined) {
+        fallback = { source: env.source, masked: maskKey(env.key) }
+      } else {
+        const file = await authFileKey()
+        if (file !== undefined) fallback = { source: file.source, masked: maskKey(file.key) }
       }
     }
+    const masked = memoryKey !== undefined
+      ? maskKey(memoryKey)
+      : active !== undefined ? maskKey(active.key) : (fallback?.masked ?? null)
     return {
-      configured: resolved !== undefined,
-      source: resolved?.source ?? null,
-      masked: resolved === undefined ? null : maskKey(resolved.key),
+      configured: masked !== null,
+      source: memoryKey !== undefined ? 'memory' : active !== undefined ? 'stored' : (fallback?.source ?? null),
+      masked,
       // `writable` describes the credential store only: a session-only key works
       // even when this profile has none, so the UI keeps that path open.
-      writable,
+      writable: state.writable,
       memoryOnly: true,
+      activeId: memoryKey !== undefined ? SESSION_ID : (active?.id ?? null),
+      items,
+      fallback,
     }
   }
 
@@ -302,45 +398,79 @@ export function apply(ctx) {
   }
 
   async function setKey(payload) {
-    const raw = payload !== null && typeof payload === 'object' ? payload.key : undefined
+    const value = payload !== null && typeof payload === 'object' && typeof payload.key === 'string' ? payload.key.trim() : ''
     const persist = payload !== null && typeof payload === 'object' ? payload.persist !== false : true
-    const value = typeof raw === 'string' ? raw.trim() : ''
+    const label = payload !== null && typeof payload === 'object' && typeof payload.label === 'string' ? payload.label.trim() : ''
+    const target = payload !== null && typeof payload === 'object' && typeof payload.id === 'string' ? payload.id : undefined
     if (value === '') return fail('invalid-key', 'The API key must be a non-empty string.')
-    cache.result = undefined
-    cache.at = 0
+    resetCache()
     if (persist !== true) {
       // Session-only: the value lives in this plugin's closure and dies with it.
       memoryKey = value
-      return ok({ configured: true, masked: maskKey(value), source: 'memory', writable: true })
+      return ok(await describeKey())
     }
+    const state = await readKeyState()
+    const items = state.stored.slice()
+    const existing = target === undefined ? undefined : items.find((item) => item.id === target)
+    let activeId
+    if (existing !== undefined) {
+      existing.key = value
+      if (label !== '') existing.label = label
+      activeId = existing.id
+    } else {
+      let index = items.length + 1
+      while (items.some((item) => item.id === `key-${index}`)) index += 1
+      activeId = `key-${index}`
+      items.push({ id: activeId, label: label !== '' ? label : `Key ${index}`, key: value })
+    }
+    const failure = await writeKeyState(items, activeId)
+    if (failure !== undefined) return fail(failure, 'The key could not be saved.')
     memoryKey = undefined
-    const credentials = ctx.get('credentials')
-    if (credentials === undefined || typeof credentials.modifyRecord !== 'function') {
-      return fail('no-credential-store', 'This profile has no credential store; set OPENCODE_GO_API_KEY instead.')
-    }
-    try {
-      await credentials.modifyRecord(KEY_RECORD, async () => ({ kind: 'api-key', key: value }))
-    } catch (error) {
-      return fail('save-failed', error instanceof Error ? error.message : String(error))
-    }
-    return ok({ configured: true, masked: maskKey(value), source: 'stored', writable: true })
+    return ok(await describeKey())
   }
 
-  async function clearKey() {
+  async function selectKey(payload) {
+    const id = payload !== null && typeof payload === 'object' && typeof payload.id === 'string' ? payload.id : ''
+    if (id === '') return fail('invalid-key', 'A key id is required.')
+    resetCache()
+    if (id === SESSION_ID) {
+      if (memoryKey === undefined) return fail('no-key', 'This session has no key to select.')
+      return ok(await describeKey())
+    }
+    const state = await readKeyState()
+    if (!state.stored.some((item) => item.id === id)) return fail('unknown-key', 'That key is no longer saved.')
     memoryKey = undefined
-    cache.result = undefined
-    cache.at = 0
-    const credentials = ctx.get('credentials')
-    if (credentials === undefined || typeof credentials.deleteRecord !== 'function') {
-      return fail('no-credential-store', 'This profile has no credential store.')
+    const failure = await writeKeyState(state.stored, id)
+    if (failure !== undefined) return fail(failure, 'The active key could not be saved.')
+    return ok(await describeKey())
+  }
+
+  async function clearKey(payload) {
+    const id = payload !== null && typeof payload === 'object' && typeof payload.id === 'string' ? payload.id : undefined
+    resetCache()
+    if (id === SESSION_ID) {
+      memoryKey = undefined
+      return ok(await describeKey())
     }
-    try {
-      await credentials.deleteRecord(KEY_RECORD)
-    } catch (error) {
-      return fail('save-failed', error instanceof Error ? error.message : String(error))
+    const credentials = credentialStore()
+    if (id === undefined) {
+      memoryKey = undefined
+      if (credentials !== undefined && typeof credentials.deleteRecord === 'function') {
+        try {
+          await credentials.deleteRecord(KEYS_RECORD)
+          await credentials.deleteRecord(LEGACY_KEY_RECORD)
+        } catch (error) {
+          return fail('save-failed', error instanceof Error ? error.message : String(error))
+        }
+      }
+      return ok(await describeKey())
     }
-    cache.result = undefined
-    cache.at = 0
+    const state = await readKeyState()
+    const items = state.stored.filter((item) => item.id !== id)
+    if (items.length === state.stored.length) return fail('unknown-key', 'That key is not saved.')
+    const activeId = state.activeId === id ? (items[0]?.id ?? null) : state.activeId
+    const failure = await writeKeyState(items, activeId)
+    if (failure !== undefined) return fail(failure, 'The key could not be removed.')
     return ok(await describeKey())
   }
 
@@ -355,16 +485,17 @@ export function apply(ctx) {
       case 'setKey':
         return setKey(payload)
       case 'clearKey':
-        return clearKey()
+        return clearKey(payload)
+      case 'selectKey':
+        return selectKey(payload)
       default:
         return fail('unknown-endpoint', `Unknown endpoint "${endpoint}".`)
     }
   }
 
   ctx.effect(() => ctx.on('credentials/record-updated', (key) => {
-    if (key !== KEY_RECORD) return
-    cache.result = undefined
-    cache.at = 0
+    if (key !== KEYS_RECORD && key !== LEGACY_KEY_RECORD) return
+    resetCache()
   }), 'opencode-go-usage: credential record changes')
 
   /**
