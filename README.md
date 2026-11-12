@@ -48,12 +48,6 @@ github:kzhw615/dsh-opencode-go-usage
 https://github.com/kzhw615/dsh-opencode-go-usage
 ```
 
-**From npm** (once published):
-
-```
-dsh-opencode-go-strip
-```
-
 **From a checkout** — clone the repository, then **Settings › Plugins › Add plugin**
 and choose the directory.
 
@@ -64,12 +58,18 @@ again; an unchanged address is reported as already installed.
 `package.json` declares `engines.dsh: ">=0.2.2-rc.2"`, so an older Harness refuses
 the install instead of accepting a bundle whose slot never registers.
 
-## Publishing
+## Releasing
 
-`npm run build:index` rewrites `plugin-index.json`. It pins the checked-out commit
-for a git source, so run it after committing a change and commit the regenerated
-index; `npm run build:index -- --npm` switches the entry to the published package
-once `npm publish` has run (the package name is `dsh-opencode-go-strip`).
+The bundle ships from this repository only. `package.json` is `private`, so a stray
+`npm publish` cannot push it out, while installing from git keeps working.
+
+1. Commit the change.
+2. `npm run build:index` — it pins the commit you just made, so the market always
+   installs a bundle whose files match the entry.
+3. Commit the regenerated `plugin-index.json` and push.
+
+`test/index.test.mjs` fails when the index disagrees with `package.json`, so a
+forgotten regeneration is caught before the push.
 
 ## Configure the key
 
@@ -181,12 +181,6 @@ https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-usage/main/plugin-inde
 ```
 github:kzhw615/dsh-opencode-go-usage
 https://github.com/kzhw615/dsh-opencode-go-usage
-```
-
-**从 npm 装**（发布后）：
-
-```
-dsh-opencode-go-strip
 ```
 
 **已经 clone 了** —— **设置 › 插件 › 添加插件**，选择该目录。

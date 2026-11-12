@@ -1,6 +1,7 @@
 {
   "name": "dsh-opencode-go-strip",
   "version": "1.0.0",
+  "private": true,
   "description": "Shows OpenCode Go plan usage (5-hour, weekly, monthly) in a strip below the composer",
   "license": "MIT",
   "type": "module",
@@ -24,7 +25,6 @@
   "scripts": {
     "test": "node test/guards.test.mjs && node test/host.test.mjs && node test/client.test.mjs && node test/index.test.mjs",
     "check": "node --check index.js && node --check client.js",
-    "prepublishOnly": "npm test",
     "build:index": "node scripts/build-index.mjs"
   },
   "dsh": {
