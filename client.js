@@ -54,6 +54,7 @@ window.__ModuleLoader__.load({
       'panel.keyMissing': 'Not configured',
       'panel.setKey': 'Set key',
       'panel.keys': 'Saved keys',
+      'panel.keyShort': 'Key',
       'panel.addKey': 'Add another key',
       'panel.thisSession': 'This session',
       'panel.keyLabel': 'Label (optional)',
@@ -118,6 +119,7 @@ window.__ModuleLoader__.load({
       'panel.keyMissing': '未配置',
       'panel.setKey': '设置 Key',
       'panel.keys': '已保存的 Key',
+      'panel.keyShort': 'Key',
       'panel.addKey': '添加新 Key',
       'panel.thisSession': '本次会话',
       'panel.keyLabel': '标签（可选）',
@@ -356,8 +358,14 @@ window.__ModuleLoader__.load({
   white-space: nowrap;
 }
 .ocg-menu-add { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); }
-.ocg-key-name { color: var(--dsw-alias-label-secondary); }
-.ocg-btn-icon { padding: 2px 6px; }
+.ocg-key-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+}
+.ocg-btn-icon { padding: 2px 5px; }
 .ocg-caret {
   display: inline-block;
   width: 0;
@@ -448,19 +456,21 @@ window.__ModuleLoader__.load({
 .ocg-pop-foot {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
   padding-top: 2px;
 }
 .ocg-pop-key {
   display: inline-flex;
   align-items: baseline;
   gap: 2px;
+  flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
+.ocg-pop-key > .ocg-hint,
+.ocg-pop-key > .ocg-mask { flex: 0 0 auto; }
 .ocg-error {
   border: 1px solid var(--dsw-alias-state-error-primary);
   border-radius: var(--dsw-radius-sm, 8px);
@@ -482,7 +492,8 @@ window.__ModuleLoader__.load({
   font-variant-numeric: tabular-nums;
 }
 .ocg-btn {
-  padding: 3px 10px;
+  flex: 0 0 auto;
+  padding: 3px 8px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-sm, 8px);
   font: var(--dsw-font-xxs-12, 12px/18px var(--dsw-font-family, inherit));
@@ -1174,8 +1185,8 @@ window.__ModuleLoader__.load({
                 ? t('panel.keyDetail')
                 : `${t('panel.keyDetail')} ${keyInfo.source}`,
             },
-            h('span', { className: 'ocg-hint' }, `${t('panel.key')}: `),
-            activeLabel === '' ? null : h('span', { className: 'ocg-key-name' }, `${activeLabel} `),
+            h('span', { className: 'ocg-hint' }, `${t('panel.keyShort')}: `),
+            activeLabel === '' ? null : h('span', { className: 'ocg-key-name', title: activeLabel }, `${activeLabel} `),
             h('span', { className: 'ocg-mask' }, keyInfo?.masked ?? t('panel.keyMissing')),
             sourceLabel === '' || keyInfo?.source === 'stored'
               ? null
