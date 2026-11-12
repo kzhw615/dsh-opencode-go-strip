@@ -59,12 +59,12 @@
       },
       "versions": [
         {
-          "version": "1.1.0",
-          "publishTimestamp": 1794474578,
+          "version": "1.1.1",
+          "publishTimestamp": 1794500372,
           "source": {
             "type": "git",
             "url": "https://github.com/kzhw615/dsh-opencode-go-strip.git",
-            "commit": "5062e1a2d0bd7a5cb7fb0c88dca05ab7310b9952"
+            "commit": "5424b151f14e942c90974d3460bff12209d8252e"
           },
           "engines": {
             "dsh": ">=0.2.2-rc.2"
