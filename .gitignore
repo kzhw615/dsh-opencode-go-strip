@@ -22,3 +22,6 @@ Thumbs.db
 .env
 .env.*
 .credentials.yaml
+
+# Packed artefacts from npm pack / publish dry runs
+*.tgz

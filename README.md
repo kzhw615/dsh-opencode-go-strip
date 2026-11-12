@@ -7,7 +7,7 @@ a compact strip under the composer, and a popover with per-window rings.
 
 ## What it shows
 
-![The quota strip below the composer](docs/strip.png)
+![The quota strip below the composer](https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-usage/main/docs/strip.png)
 
 - **Strip** (below the composer, always visible while a session is open): a status
   dot, the `OpenCode Go` label, and one ring per plan window with its used percentage.
@@ -33,35 +33,43 @@ The three windows come from the OpenCode Go plan: rolling 5-hour, weekly, monthl
 
 The repository is a complete DSH bundle: no dependencies, no build step.
 
-**From GitHub, without cloning** — open **Settings › Plugins › Add plugin** and paste
-either address:
+**From the plugin market** — install the experimental plugin-market bundle once,
+then add this index URL in its **Discover** tab:
+
+```
+https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-usage/main/plugin-index.json
+```
+
+**From GitHub, without cloning** — **Settings › Plugins › Add plugin**, paste either
+address:
 
 ```
 github:kzhw615/dsh-opencode-go-usage
-```
-
-or the repository URL itself:
-
-```
 https://github.com/kzhw615/dsh-opencode-go-usage
 ```
 
-DSH checks the repository, installs it with its bundled pnpm, and verifies the bundle
-patch. To pick up later commits, remove the bundle and add it again — an unchanged
-address is reported as already installed.
+**From npm** (once published):
+
+```
+dsh-opencode-go-strip
+```
 
 **From a checkout** — clone the repository, then **Settings › Plugins › Add plugin**
 and choose the directory.
 
-Either way the bundle enables itself; the strip appears the next time a session is
-open.
+Every route ends the same way: the bundle enables itself and the strip appears the
+next time a session is open. To pick up later commits, remove the bundle and add it
+again; an unchanged address is reported as already installed.
 
-Two limits worth knowing:
+`package.json` declares `engines.dsh: ">=0.2.2-rc.2"`, so an older Harness refuses
+the install instead of accepting a bundle whose slot never registers.
 
-- The package is not published to npm, so it does not appear in any plugin catalog.
-  Install it from the address above.
-- `package.json` declares `engines.dsh: ">=0.2.2-rc.2"`. An older DSH refuses the
-  install instead of rendering a strip that never appears.
+## Publishing
+
+`npm run build:index` rewrites `plugin-index.json`. It pins the checked-out commit
+for a git source, so run it after committing a change and commit the regenerated
+index; `npm run build:index -- --npm` switches the entry to the published package
+once `npm publish` has run (the package name is `dsh-opencode-go-strip`).
 
 ## Configure the key
 
@@ -161,28 +169,33 @@ DSH（DeepSeek Harness）的 OpenCode Go 额度插件：输入框下方一条细
 
 本仓库本身就是一个完整 bundle（无依赖、无构建步骤）。
 
-**不用 clone**：打开 **设置 › 插件 › 添加插件**，粘贴下面任一地址：
+**从插件市场装** —— 先装一次官方的实验性插件市场 bundle，然后在其 **Discover** 页添加本索
+引地址：
+
+```
+https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-usage/main/plugin-index.json
+```
+
+**从 GitHub 装（不用 clone）** —— **设置 › 插件 › 添加插件**，粘贴下面任一地址：
 
 ```
 github:kzhw615/dsh-opencode-go-usage
-```
-
-或者仓库地址本身：
-
-```
 https://github.com/kzhw615/dsh-opencode-go-usage
 ```
 
-DSH 会先检查仓库、用内置 pnpm 安装并校验 bundle patch。想更新到新提交，移除后重新添加
-即可（地址没变时会被判定为「已安装」）。
+**从 npm 装**（发布后）：
 
-**已经 clone 了**：**设置 › 插件 › 添加插件**，选择该目录即可。
+```
+dsh-opencode-go-strip
+```
 
-两种情况都会自动启用，打开会话就能看到细条。
+**已经 clone 了** —— **设置 › 插件 › 添加插件**，选择该目录。
 
-两点限制：本包未发布到 npm，所以不会出现在插件市场里，只能按上面的地址安装；
-`package.json` 声明了 `engines.dsh: ">=0.2.2-rc.2"`，更老的 DSH 会直接拒绝安装，
-而不是装上去却看不到细条。
+四条路殊途同归：bundle 会自动启用，打开会话就能看到细条。想更新到新提交，移除后重新添
+加即可（地址没变时会被判定为「已安装」）。
+
+`package.json` 声明了 `engines.dsh: ">=0.2.2-rc.2"`，更老的 DSH 会直接拒绝安装，而不是
+装上去却看不到细条。
 
 ### 配置 Key
 

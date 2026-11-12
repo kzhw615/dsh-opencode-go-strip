@@ -1,9 +1,9 @@
 {
-  "name": "@local/opencode-go-usage",
+  "name": "dsh-opencode-go-strip",
   "version": "1.0.0",
-  "private": true,
-  "type": "module",
   "description": "Shows OpenCode Go plan usage (5-hour, weekly, monthly) in a strip below the composer",
+  "license": "MIT",
+  "type": "module",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -18,6 +18,15 @@
     "README.md",
     "icon.svg"
   ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.2"
+  },
+  "scripts": {
+    "test": "node test/guards.test.mjs && node test/host.test.mjs && node test/client.test.mjs && node test/index.test.mjs",
+    "check": "node --check index.js && node --check client.js",
+    "prepublishOnly": "npm test",
+    "build:index": "node scripts/build-index.mjs"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -32,7 +41,14 @@
       ]
     }
   },
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kzhw615/dsh-opencode-go-usage.git"
+  },
+  "homepage": "https://github.com/kzhw615/dsh-opencode-go-usage#readme",
+  "bugs": {
+    "url": "https://github.com/kzhw615/dsh-opencode-go-usage/issues"
+  },
   "keywords": [
     "dsh",
     "deepseek-harness",
@@ -41,12 +57,5 @@
     "opencode",
     "quota",
     "usage"
-  ],
-  "scripts": {
-    "test": "node test/guards.test.mjs && node test/host.test.mjs && node test/client.test.mjs",
-    "check": "node --check index.js && node --check client.js"
-  },
-  "engines": {
-    "dsh": ">=0.2.2-rc.2"
-  }
+  ]
 }

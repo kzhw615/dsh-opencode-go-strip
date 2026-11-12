@@ -7,7 +7,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: '@local/opencode-go-usage',
+  id: 'dsh-opencode-go-strip',
   factory(require) {
     const React = require('react')
     const h = React.createElement
