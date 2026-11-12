@@ -16,6 +16,9 @@ import { join } from 'node:path'
 
 const API_URL = 'https://opencode.ai/zen/go/v1/usage'
 const CHANNEL = '/opencode-go-usage'
+const UPDATE_INDEX_URL = 'https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-strip/main/plugin-index.json'
+const UPDATE_TTL_MS = 10 * 60_000
+const UPDATE_TIMEOUT_MS = 15_000
 const KEYS_RECORD = 'opencode-go-usage/keys'
 const LEGACY_KEY_RECORD = 'opencode-go-usage/api-key'
 const SESSION_ID = 'session'
@@ -366,6 +369,128 @@ export function apply(ctx) {
     }
   }
 
+  /** The version this copy runs, read from the manifest beside this module. */
+  let manifestPromise
+  function ownManifest() {
+    manifestPromise ??= readFile(new URL('./package.json', import.meta.url), 'utf8')
+      .then((text) => JSON.parse(text))
+      .catch(() => undefined)
+    return manifestPromise
+  }
+
+  /**
+   * What the published index names. It is the release channel: each entry pins the
+   * commit that carries that version, which is exactly what `updateBundle` takes.
+   */
+  async function latestRelease(signal) {
+    if (cache.update !== undefined && Date.now() - cache.updateAt < UPDATE_TTL_MS) return cache.update
+    const deadline = deadlineSignal(signal)
+    try {
+      const response = await fetch(UPDATE_INDEX_URL, {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+        signal: deadline.signal,
+      })
+      if (!response.ok) return undefined
+      const body = await response.json()
+      const entry = Array.isArray(body?.plugins) ? body.plugins[0] : undefined
+      const version = Array.isArray(entry?.versions) ? entry.versions[0] : undefined
+      if (version === undefined || typeof version.version !== 'string') return undefined
+      const result = {
+        version: version.version,
+        commit: version.source?.type === 'git' ? version.source.commit : undefined,
+        url: version.source?.type === 'git' ? version.source.url : undefined,
+      }
+      cache.update = result
+      cache.updateAt = Date.now()
+      return result
+    } catch {
+      return undefined
+    } finally {
+      deadline.done()
+    }
+  }
+
+  function compareVersions(left, right) {
+    const parse = (value) => String(value).split('-')[0].split('.').map((part) => Number.parseInt(part, 10) || 0)
+    const a = parse(left)
+    const b = parse(right)
+    for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+      const diff = (a[index] ?? 0) - (b[index] ?? 0)
+      if (diff !== 0) return diff
+    }
+    return String(left) === String(right) ? 0 : String(left).localeCompare(String(right))
+  }
+
+  /**
+   * Whether this copy can be replaced in place. Only a Git-installed bundle is
+   * updatable: a local directory is the user's own checkout, and the manager
+   * refuses a registry target that is not on a registry.
+   */
+  async function updateState() {
+    const manifest = await ownManifest()
+    const latest = await latestRelease()
+    let current = typeof manifest?.version === 'string' ? manifest.version : undefined
+    let entry
+    const manager = ctx.get('pluginManager')
+    if (manager !== undefined && typeof manager.listBundles === 'function') {
+      try {
+        const bundles = await manager.listBundles()
+        entry = bundles.find((bundle) => bundle.name === (manifest?.name ?? entry?.name))
+      } catch {
+        entry = undefined
+      }
+    }
+    // The manager knows the installed version without reading this module, so it
+    // is the more reliable source when it is available.
+    if (typeof entry?.version === 'string') current = entry.version
+    const state = {
+      current: current ?? null,
+      latest: latest?.version ?? null,
+      // An unknown current version still lets a release be reported.
+      available: current === undefined || latest === undefined ? null : compareVersions(latest.version, current) > 0,
+      canApply: false,
+      reason: 'unsupported',
+    }
+    if (state.available !== true) {
+      state.reason = latest === undefined ? 'unreachable' : 'current'
+      return state
+    }
+    if (manager === undefined || typeof manager.updateBundle !== 'function') {
+      state.reason = 'no-manager'
+      return state
+    }
+    if (entry === undefined) {
+      state.reason = 'unknown-bundle'
+      return state
+    }
+    if (entry.update !== 'git') {
+      // A checkout, or a copy pnpm installed from a registry.
+      state.reason = 'not-git'
+      return state
+    }
+    state.canApply = true
+    state.reason = 'ready'
+    state.spec = `git+${latest.url}#${latest.commit}`
+    return state
+  }
+
+  async function applyUpdate() {
+    const state = await updateState()
+    if (state.canApply !== true) return ok(state)
+    const manager = ctx.get('pluginManager')
+    const manifest = await ownManifest()
+    // The manager removes this bundle first, so this plugin unloads mid-call: the
+    // answer is the acknowledgement, and the page watches for the new version.
+    try {
+      const pending = manager.updateBundle(manifest.name, state.latest, { spec: state.spec })
+      pending?.catch?.(() => {})
+    } catch (error) {
+      return fail('update-failed', error instanceof Error ? error.message : String(error))
+    }
+    return ok({ ...state, started: true })
+  }
+
   async function loadUsage(force, signal) {
     const now = Date.now()
     if (force !== true && cache.result !== undefined) {
@@ -488,6 +613,10 @@ export function apply(ctx) {
         return clearKey(payload)
       case 'selectKey':
         return selectKey(payload)
+      case 'update':
+        return payload !== null && typeof payload === 'object' && payload.action === 'apply'
+          ? applyUpdate()
+          : ok(await updateState())
       default:
         return fail('unknown-endpoint', `Unknown endpoint "${endpoint}".`)
     }

@@ -64,7 +64,7 @@ const findAll = (node, predicate, out = []) => { walk(node, (candidate) => { if 
 /**
  * Render one state. `useStateAt` overrides the initial value of a hook slot:
  * 0 snapshot, 1 expanded, 3 key info, 9 placement, 10 label draft, 11 key menu,
- * 12 hover tooltip, 13 armed delete (14 is the countdown clock).
+ * 12 hover tooltip, 13 armed delete, 14 update state (15 is the countdown clock).
  */
 function render({ useStateAt = {}, lastGood } = {}) {
   let stateIndex = 0
@@ -204,6 +204,22 @@ check('the tooltip names the window', textOf(tip).includes('本周'), textOf(tip
 check('the tooltip shows used and remaining', textOf(tip).includes('已用') && textOf(tip).includes('剩余'))
 check('the tooltip is anchored above the strip', tip?.props?.style?.bottom === 240 && tip?.props?.style?.position === 'fixed')
 check('the tooltip is a tooltip for assistive tech', tip?.props?.role === 'tooltip')
+
+// ---- release channel --------------------------------------------------------
+const upToDate = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: storedKey, 9: placement, 14: { current: '1.0.0', latest: '1.0.0', available: false, canApply: false, reason: 'current' } } })
+check('an up-to-date copy shows no update control', findAll(upToDate.card, (node) => node.props?.className === 'ocg-update').length === 0)
+check('the running version is shown', textOf(upToDate.card).includes('v1.0.0'), textOf(upToDate.card).slice(0, 90))
+
+const offered = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: storedKey, 9: placement, 14: { current: '1.0.0', latest: '1.2.0', available: true, canApply: true, reason: 'ready', spec: 'git+https://example.invalid#abc' } } })
+const updateButton = findAll(offered.card, (node) => node.props?.className === 'ocg-update')[0]
+check('a newer release offers an update control', updateButton !== undefined)
+check('the control names the version', textOf(updateButton).includes('1.2.0'), textOf(updateButton))
+check('the control explains itself', typeof updateButton?.props?.title === 'string' && updateButton.props.title.includes('1.2.0'))
+
+const starting = render({ useStateAt: { 0: { status: 'ready', value: readyValue }, 1: true, 3: storedKey, 9: placement, 14: { current: '1.0.0', latest: '1.2.0', available: true, canApply: true, started: true } } })
+const busyButton = findAll(starting.card, (node) => node.props?.className === 'ocg-update')[0]
+check('an update in progress is disabled', busyButton?.props?.disabled === true)
+check('an update in progress says so', textOf(busyButton).includes('正在更新'), textOf(busyButton))
 
 if (failures.length > 0) {
   console.error(`${failures.length} client check(s) failed:`)

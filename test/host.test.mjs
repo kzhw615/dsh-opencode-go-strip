@@ -30,7 +30,24 @@ const usageBody = {
 
 let fetchCalls = 0
 let fetchMode = 'ok'
-const fakeFetch = async () => {
+const releaseIndex = {
+  format: 1,
+  title: 'Releases',
+  plugins: [{
+    name: 'dsh-opencode-go-strip',
+    versions: [{
+      version: '1.2.0',
+      publishTimestamp: 1_760_000_000,
+      source: { type: 'git', url: 'https://github.com/kzhw615/dsh-opencode-go-strip.git', commit: 'a'.repeat(40) },
+    }],
+  }],
+}
+let releaseReachable = true
+const fakeFetch = async (url) => {
+  if (String(url).includes('raw.githubusercontent.com')) {
+    if (!releaseReachable) throw new Error('offline')
+    return new Response(JSON.stringify(releaseIndex), { status: 200 })
+  }
   fetchCalls += 1
   if (fetchMode === 'unauthorized') return new Response('{}', { status: 401 })
   if (fetchMode === 'not-json') return new Response('<html>nope</html>', { status: 200 })
@@ -228,6 +245,74 @@ check('the adopted key is selectable', legacyKey.json?.value?.items?.[0]?.id ===
 check('the legacy record is left untouched', legacyStore.records.get(LEGACY)?.key === SECRET)
 const migrated = await call(legacyHost, '/opencode-go-usage/selectKey', { body: JSON.stringify({ id: 'saved' }) })
 check('selecting it migrates to the new record', savedItems(legacyStore).length === 1 && migrated.json?.ok === true)
+
+// ---- update check -----------------------------------------------------------
+const plain = makeHost()
+const checked = (await call(plain, '/opencode-go-usage/update')).json?.value
+check('the update check reports the running version', typeof checked?.current === 'string', String(checked?.current))
+check('the update check reports the published version', checked?.latest === '1.2.0', String(checked?.latest))
+check('a newer version is offered', checked?.available === true)
+check('without a plugin manager it cannot be applied', checked?.canApply === false && checked?.reason === 'no-manager', String(checked?.reason))
+
+function managerHost({ updateKind = 'git', failWith } = {}) {
+  const calls = []
+  const registered = []
+  const ctx = {
+    logger: { warn() {}, info() {}, error() {} },
+    get(name) {
+      if (name === 'webServer') return { protocol: 'http:', port: 0, register(route) { registered.push(route); return () => {} } }
+      if (name === 'connection') return { admit: () => ({}) }
+      if (name === 'pluginManager') {
+        return {
+          async listBundles() { return [{ name: 'dsh-opencode-go-strip', update: updateKind }] },
+          updateBundle(name, version, options) {
+            calls.push({ name, version, options })
+            if (failWith !== undefined) throw new Error(failWith)
+            return Promise.resolve({ from: checked.current, to: version, step: 'check', result: { changed: true } })
+          },
+        }
+      }
+      return undefined
+    },
+    on() { return () => {} },
+    effect(callback) { const dispose = callback(); return () => { if (typeof dispose === 'function') dispose() } },
+    inject(services, callback) {
+      for (const service of services) if (ctx.get(service) === undefined) return
+      callback({ get: (name) => ctx.get(name), effect: ctx.effect, on: ctx.on })
+    },
+  }
+  globalThis.fetch = fakeFetch
+  apply(ctx)
+  return { route: registered[0], calls }
+}
+
+const gitHost = managerHost()
+const gitState = (await call(gitHost, '/opencode-go-usage/update')).json?.value
+check('a git-installed bundle can be updated', gitState?.canApply === true && gitState?.reason === 'ready', String(gitState?.reason))
+check('the update spec pins the published commit', gitState?.spec === `git+https://github.com/kzhw615/dsh-opencode-go-strip.git#${'a'.repeat(40)}`, gitState?.spec)
+
+const applied = await call(gitHost, '/opencode-go-usage/update', { body: JSON.stringify({ action: 'apply' }) })
+check('applying asks the manager to replace the bundle', applied.json?.value?.started === true)
+check('the manager receives the exact target', gitHost.calls.length === 1
+  && gitHost.calls[0].name === 'dsh-opencode-go-strip'
+  && gitHost.calls[0].version === '1.2.0'
+  && gitHost.calls[0].options.spec.startsWith('git+https://github.com/kzhw615/dsh-opencode-go-strip.git#'), JSON.stringify(gitHost.calls[0] ?? {}))
+
+const registryHost = managerHost({ updateKind: 'registry' })
+check('a registry copy is not updated by this check', (await call(registryHost, '/opencode-go-usage/update')).json?.value?.reason === 'not-git')
+const linkHost = managerHost({ updateKind: null })
+check('a local directory copy is not updated either', (await call(linkHost, '/opencode-go-usage/update')).json?.value?.reason === 'not-git')
+const refused = await call(registryHost, '/opencode-go-usage/update', { body: JSON.stringify({ action: 'apply' }) })
+check('applying a refused state changes nothing', refused.json?.value?.started === undefined && registryHost.calls.length === 0)
+
+const brokenHost = managerHost({ failWith: 'manager exploded' })
+check('a manager failure is reported', (await call(brokenHost, '/opencode-go-usage/update', { body: JSON.stringify({ action: 'apply' }) })).json?.error?.code === 'update-failed')
+
+releaseReachable = false
+const offlineHost = makeHost()
+const offline = (await call(offlineHost, '/opencode-go-usage/update')).json?.value
+check('an unreachable index is not an error', offline?.latest === null && offline?.available === null && offline?.reason === 'unreachable', String(offline?.reason))
+releaseReachable = true
 
 // ---- profile without a credential store -------------------------------------
 const bare = makeHost()

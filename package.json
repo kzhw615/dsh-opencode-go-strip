@@ -25,7 +25,8 @@
   "scripts": {
     "test": "node test/guards.test.mjs && node test/host.test.mjs && node test/client.test.mjs && node test/index.test.mjs",
     "check": "node --check index.js && node --check client.js",
-    "build:index": "node scripts/build-index.mjs"
+    "build:index": "node scripts/build-index.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dsh": {
     "bundle": {
@@ -43,11 +44,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kzhw615/dsh-opencode-go-usage.git"
+    "url": "git+https://github.com/kzhw615/dsh-opencode-go-strip.git"
   },
-  "homepage": "https://github.com/kzhw615/dsh-opencode-go-usage#readme",
+  "homepage": "https://github.com/kzhw615/dsh-opencode-go-strip#readme",
   "bugs": {
-    "url": "https://github.com/kzhw615/dsh-opencode-go-usage/issues"
+    "url": "https://github.com/kzhw615/dsh-opencode-go-strip/issues"
   },
   "keywords": [
     "dsh",

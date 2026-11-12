@@ -79,8 +79,12 @@ check('labels stay dimmer than values', /\.ocg-pop-label \{[^}]*label-tertiary/.
 // --------------------------------------------------------------- behaviour
 check('the key is never returned to the page', !/value\.key\b/.test(client) && host.includes('maskKey'))
 // Quoted literals only, so the doc comment above the constant does not count.
-check('exactly one outbound endpoint', (host.match(/'https?:\/\/[^']+'/g) ?? []).length === 1,
-  (host.match(/'https?:\/\/[^']+'/g) ?? []).join(', '))
+// Two endpoints are declared: the usage API, and this plugin's own release index.
+const endpoints = [...new Set(host.match(/'https?:\/\/[^']+'/g) ?? [])]
+check('exactly two outbound endpoints', endpoints.length === 2, endpoints.join(', '))
+check('the usage endpoint is the OpenCode Go API', endpoints.some((url) => url.includes('opencode.ai/zen/go/v1/usage')))
+check('the release index is this repository', endpoints.some((url) => url.includes('raw.githubusercontent.com/kzhw615/dsh-opencode-go-strip')))
+check('the update check carries no credentials', !/UPDATE_INDEX_URL[\s\S]{0,400}authorization/i.test(host))
 check('the plugin declares no agent tool', !/ctx\.tools/.test(host))
 check('the plugin writes no session event', !/session\.append|appendPluginRecord/.test(host))
 check('the popover is portaled, with an inline fallback', client.includes('createPortal') && client.includes('ocg-pop-inline'))

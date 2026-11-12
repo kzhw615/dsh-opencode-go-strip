@@ -1,4 +1,4 @@
-# dsh-opencode-go-usage
+# dsh-opencode-go-strip
 
 An [OpenCode Go](https://opencode.ai/go) quota meter for **DeepSeek Harness (DSH)**:
 a compact strip under the composer, and a popover with per-window rings.
@@ -7,7 +7,7 @@ a compact strip under the composer, and a popover with per-window rings.
 
 ## What it shows
 
-![The quota strip below the composer](https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-usage/main/docs/strip.png)
+![The quota strip below the composer](https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-strip/main/docs/strip.png)
 
 - **Strip** (below the composer, always visible while a session is open): a status
   dot, the `OpenCode Go` label, and one ring per plan window with its used percentage.
@@ -37,15 +37,15 @@ The repository is a complete DSH bundle: no dependencies, no build step.
 then add this index URL in its **Discover** tab:
 
 ```
-https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-usage/main/plugin-index.json
+https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-strip/main/plugin-index.json
 ```
 
 **From GitHub, without cloning** — **Settings › Plugins › Add plugin**, paste either
 address:
 
 ```
-github:kzhw615/dsh-opencode-go-usage
-https://github.com/kzhw615/dsh-opencode-go-usage
+github:kzhw615/dsh-opencode-go-strip
+https://github.com/kzhw615/dsh-opencode-go-strip
 ```
 
 **From a checkout** — clone the repository, then **Settings › Plugins › Add plugin**
@@ -58,18 +58,36 @@ again; an unchanged address is reported as already installed.
 `package.json` declares `engines.dsh: ">=0.2.2-rc.2"`, so an older Harness refuses
 the install instead of accepting a bundle whose slot never registers.
 
+## Updates
+
+The popover shows the running version beside the update stamp. When the published
+index names a newer one, an **Update** button appears next to it: pressing it asks
+DSH's plugin manager to replace the bundle with the commit that index pins, which
+is the same atomic remove-and-install the plugin panel performs, and the strip
+reloads with the new code.
+
+That works for a bundle installed from Git or from the plugin market. A copy
+installed from a local folder is your own checkout — the plugin reports
+`not-git` and leaves it alone; update the checkout instead.
+
+The version check reads this repository's `plugin-index.json` from
+`raw.githubusercontent.com`, cached for ten minutes by the Host and polled on the
+same slow cadence from the page. It carries no credential.
+
 ## Releasing
 
 The bundle ships from this repository only. `package.json` is `private`, so a stray
 `npm publish` cannot push it out, while installing from git keeps working.
 
-1. Commit the change.
-2. `npm run build:index` — it pins the commit you just made, so the market always
-   installs a bundle whose files match the entry.
-3. Commit the regenerated `plugin-index.json` and push.
+```sh
+npm run release minor     # or patch / major; --dry-run prints the plan
+```
 
+That bumps the version, runs the tests, commits, regenerates `plugin-index.json`
+pinned to that commit, commits the index, tags, and pushes — in that order,
+because the index must point at a commit that already carries the new version.
 `test/index.test.mjs` fails when the index disagrees with `package.json`, so a
-forgotten regeneration is caught before the push.
+forgotten regeneration cannot be pushed.
 
 ## Configure the key
 
@@ -109,8 +127,12 @@ opens the input form directly.
   or an environment variable, if you do not want it on disk.
 - Nothing here logs the key, and the plugin registers no agent tool and writes no
   session event, so the key never reaches a model request or transcript.
-- The value is sent to exactly one host: `GET https://opencode.ai/zen/go/v1/usage`
-  with an `Authorization: Bearer` header. No other network calls are made.
+- The key is sent to exactly one host: `GET https://opencode.ai/zen/go/v1/usage`
+  with an `Authorization: Bearer` header.
+- One more request leaves the machine, without any credential: the update check
+  reads this repository's `plugin-index.json` from `raw.githubusercontent.com`
+  once on start and then about every ten minutes (the Host caches it for ten
+  minutes). It only ever reads a version and a commit SHA.
 - Revoke by rotating the key in the OpenCode console, or **Clear** it in the popover.
 
 ## Data and refresh behaviour
@@ -173,14 +195,14 @@ DSH（DeepSeek Harness）的 OpenCode Go 额度插件：输入框下方一条细
 引地址：
 
 ```
-https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-usage/main/plugin-index.json
+https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-strip/main/plugin-index.json
 ```
 
 **从 GitHub 装（不用 clone）** —— **设置 › 插件 › 添加插件**，粘贴下面任一地址：
 
 ```
-github:kzhw615/dsh-opencode-go-usage
-https://github.com/kzhw615/dsh-opencode-go-usage
+github:kzhw615/dsh-opencode-go-strip
+https://github.com/kzhw615/dsh-opencode-go-strip
 ```
 
 **已经 clone 了** —— **设置 › 插件 › 添加插件**，选择该目录。
@@ -210,6 +232,31 @@ https://github.com/kzhw615/dsh-opencode-go-usage
 ### 细条悬停
 
 鼠标停在细条里某个窗口上，会在它上方显示该窗口的已用/剩余比例和重置倒计时，不用打开浮层。
+
+### 更新
+
+浮层右上角会显示当前版本（跟在「更新于 …」后面）。当发布索引里有更新版本时，旁边会出现
+「更新 x.y.z」按钮：点一下就交给 DSH 的插件管理器，用索引里钉住的那个 commit 原子地
+卸载并重装，细条随之换成新代码。
+
+这条路对 **从 Git 或插件市场安装**的副本有效。如果你是从本地目录（link）安装的，那本来就
+是你的代码仓库，插件会判定为 `not-git` 不去动它——直接更新你的 checkout 即可。
+
+版本检查只读取本仓库的 `plugin-index.json`（`raw.githubusercontent.com`），Host 侧缓存
+十分钟，页面按同样稀疏的节奏轮询，**不携带任何凭证**。
+
+### 发版
+
+只从本仓库分发。`package.json` 是 `private`，误敲 `npm publish` 不会发出去，而从 git
+安装不受影响。
+
+```sh
+npm run release minor     # 或 patch / major；加 --dry-run 只打印计划
+```
+
+这个脚本按顺序做：升版本 → 跑测试 → 提交 → 按新 commit 重新生成 `plugin-index.json` →
+提交索引 → 打 tag → 推送。顺序不能反：索引必须指向"已经带上新版本号"的那个 commit。
+`test/index.test.mjs` 会在索引与 `package.json` 不一致时报错，忘记重新生成就推不出去。
 
 ### 安全
 

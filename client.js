@@ -25,6 +25,7 @@ window.__ModuleLoader__.load({
     const CHANNEL = '/opencode-go-usage'
     const WINDOW_ORDER = ['rolling', 'weekly', 'monthly']
     const POLL_MS = 60_000
+    const UPDATE_POLL_MS = 10 * 60_000
     const CLOCK_MS = 30_000
 
     const EN = {
@@ -55,6 +56,12 @@ window.__ModuleLoader__.load({
       'panel.setKey': 'Set key',
       'panel.keys': 'Saved keys',
       'panel.keyShort': 'Key',
+      'update.check': 'Check for updates',
+      'update.available': 'Version {version} is available',
+      'update.apply': 'Update',
+      'update.starting': 'Updating…',
+      'update.failed': 'Update failed',
+      'update.hint.checkout': 'Installed from a folder: update the checkout instead.',
       'panel.addKey': 'Add another key',
       'panel.thisSession': 'This session',
       'panel.keyLabel': 'Label (optional)',
@@ -123,6 +130,12 @@ window.__ModuleLoader__.load({
       'panel.addKey': '添加新 Key',
       'panel.thisSession': '本次会话',
       'panel.keyLabel': '标签（可选）',
+      'update.check': '检查更新',
+      'update.available': '有新版本 {version}',
+      'update.apply': '更新',
+      'update.starting': '正在更新…',
+      'update.failed': '更新失败',
+      'update.hint.checkout': '本地目录安装：请更新你的代码仓库。',
       'panel.removeKey': '删除 Key',
       'panel.removeConfirm': '确认？',
       'panel.changeKey': '更换 Key',
@@ -413,6 +426,33 @@ window.__ModuleLoader__.load({
   gap: 10px;
 }
 .ocg-tip-name { color: var(--dsw-alias-label-primary); }
+.ocg-update {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-brand-primary);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-brand-primary);
+  font: var(--dsw-font-xxs-12, 12px/18px var(--dsw-font-family, inherit));
+  white-space: nowrap;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .ocg-update:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-3));
+  }
+}
+.ocg-update:active:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-active, var(--dsw-alias-interactive-bg-hover));
+}
+.ocg-update:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ocg-update[data-failed="true"] {
+  border-color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-primary);
+}
 .ocg-pop-stamp {
   color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
   white-space: nowrap;
@@ -761,6 +801,7 @@ window.__ModuleLoader__.load({
         const [menuOpen, setMenuOpen] = React.useState(false)
         const [tip, setTip] = React.useState(null)
         const [deletingId, setDeletingId] = React.useState(null)
+        const [update, setUpdate] = React.useState(null)
         // Declared after `expanded` so the paused-clock read is initialised.
         const now = useClock(expanded ? CLOCK_MS : 0)
         const lastGoodRef = React.useRef(undefined)
@@ -832,6 +873,22 @@ window.__ModuleLoader__.load({
             if (typeof document !== 'undefined' && document.hidden) return
             void load(false)
           }, POLL_MS)
+
+          // The published index is the release channel; it is read once and then
+          // rarely, so a release is offered without a round trip per minute.
+          const loadUpdate = async () => {
+            try {
+              const value = await callHost('update', {})
+              if (alive) setUpdate(value)
+            } catch {
+              // An unreachable index is not worth a visible error.
+            }
+          }
+          void loadUpdate()
+          const updateTimer = setInterval(() => {
+            if (typeof document !== 'undefined' && document.hidden) return
+            void loadUpdate()
+          }, UPDATE_POLL_MS)
           const onVisibility = () => {
             if (typeof document !== 'undefined' && !document.hidden) void load(false)
           }
@@ -840,6 +897,7 @@ window.__ModuleLoader__.load({
           return () => {
             alive = false
             clearInterval(timer)
+            clearInterval(updateTimer)
             if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
           }
         }, [])
@@ -920,6 +978,19 @@ window.__ModuleLoader__.load({
         const activeItem = keyItems.find((item) => item.id === keyInfo?.activeId)
         const itemLabel = (item) => (item.id === 'session' ? t('panel.thisSession') : item.label)
         const activeLabel = activeItem === undefined ? '' : itemLabel(activeItem)
+
+        const applyUpdate = async () => {
+          if (update?.started === true) return
+          setUpdate((previous) => (previous === null ? previous : { ...previous, started: true }))
+          try {
+            const result = await callHost('update', { action: 'apply' })
+            // On success this plugin unloads before answering, so a returned state
+            // is either a refusal or a failure worth showing.
+            if (result?.started !== true) setUpdate(result)
+          } catch {
+            setUpdate((previous) => (previous === null ? previous : { ...previous, started: false, failed: true }))
+          }
+        }
 
         const saveKey = async (event) => {
           event.preventDefault()
@@ -1123,7 +1194,21 @@ window.__ModuleLoader__.load({
           h('span', { className: 'ocg-pop-title' }, t('panel.title')),
           h('span', { className: 'ocg-spacer' }),
           typeof good?.fetchedAt === 'string'
-            ? h('span', { className: 'ocg-pop-stamp' }, t('panel.updated', { time: formatClock(good.fetchedAt) }))
+            ? h('span', { className: 'ocg-pop-stamp' },
+              t('panel.updated', { time: formatClock(good.fetchedAt) }),
+              typeof update?.current === 'string' ? ` · v${update.current}` : '')
+            : null,
+          update?.available === true
+            ? h('button', {
+              type: 'button',
+              className: 'ocg-update',
+              disabled: update.started === true,
+              'data-failed': update.failed === true ? 'true' : 'false',
+              title: update.started === true
+                ? t('update.starting')
+                : update.failed === true ? t('update.failed') : t('update.available', { version: update.latest }),
+              onClick: () => { void applyUpdate() },
+            }, update.started === true ? t('update.starting') : `${t('update.apply')} ${update.latest}`)
             : null,
           h('button', {
             type: 'button',
