@@ -188,7 +188,17 @@ window.__ModuleLoader__.load({
   white-space: nowrap;
   cursor: pointer;
 }
-.ocg-summary:hover { background: var(--dsw-alias-bg-layer-2); }
+.ocg-summary {
+  transition: background-color 120ms ease;
+}
+@media (hover: hover) {
+  .ocg-summary:hover { background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-3)); }
+}
+.ocg-summary:active { background: var(--dsw-alias-interactive-bg-active, var(--dsw-alias-interactive-bg-hover)); }
+/* The strip stays highlighted while its popover is open. */
+.ocg-root[data-expanded="true"] .ocg-summary {
+  background: var(--dsw-alias-interactive-bg-active, var(--dsw-alias-interactive-bg-hover));
+}
 .ocg-summary:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);
   outline-offset: 1px;
@@ -296,7 +306,9 @@ window.__ModuleLoader__.load({
   text-align: left;
   cursor: pointer;
 }
-.ocg-menu-item:hover { background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-layer-2)); }
+@media (hover: hover) {
+  .ocg-menu-item:hover { background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-3)); }
+}
 .ocg-menu-item[aria-selected="true"] { color: var(--dsw-alias-label-primary); }
 .ocg-menu-item:disabled { opacity: 0.6; cursor: default; }
 .ocg-menu-row {
@@ -306,7 +318,9 @@ window.__ModuleLoader__.load({
   border-radius: var(--dsw-radius-xs, 4px);
   color: var(--dsw-alias-label-secondary);
 }
-.ocg-menu-row:hover { background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-layer-2)); }
+@media (hover: hover) {
+  .ocg-menu-row:hover { background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-3)); }
+}
 .ocg-menu-row[aria-selected="true"] { color: var(--dsw-alias-label-primary); }
 .ocg-menu-pick {
   display: flex;
@@ -418,10 +432,13 @@ window.__ModuleLoader__.load({
   line-height: 1;
   cursor: pointer;
 }
-.ocg-icon-btn:hover {
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-primary);
+@media (hover: hover) {
+  .ocg-icon-btn:hover {
+    background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-3));
+    color: var(--dsw-alias-label-primary);
+  }
 }
+.ocg-icon-btn:active { background: var(--dsw-alias-interactive-bg-active, var(--dsw-alias-interactive-bg-hover)); }
 .ocg-icon-btn:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);
   outline-offset: 1px;
@@ -502,7 +519,10 @@ window.__ModuleLoader__.load({
   font: inherit;
   cursor: pointer;
 }
-.ocg-btn:hover { background: var(--dsw-alias-bg-layer-2); }
+@media (hover: hover) {
+  .ocg-btn:hover { background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-3)); }
+}
+.ocg-btn:active { background: var(--dsw-alias-interactive-bg-active, var(--dsw-alias-interactive-bg-hover)); }
 .ocg-btn:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);
   outline-offset: 1px;

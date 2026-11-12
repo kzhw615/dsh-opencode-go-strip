@@ -60,6 +60,18 @@ check('no literal colours in the stylesheet', (css.match(/#[0-9a-fA-F]{3,8}\b/g)
 check('no literal font sizes', (css.match(/font-size: \d+px/g) ?? []).length === 0)
 const rawRadii = [...css.matchAll(/border-radius: (\d+)px/g)].map((m) => m[1]).filter((value) => value !== '999')
 check('no literal container radii', rawRadii.length === 0, rawRadii.join(', '))
+// Hover must use the interactive aliases: bg-layer-* is pure white in the light
+// theme, so a hover painted with it is invisible. This is how the strip ended up
+// with no hover state at all.
+const hoverRules = [...css.matchAll(/[^{}]*:hover[^{}]*\{[^}]*\}/g)].map((m) => m[0].replace(/\s+/g, ' '))
+// A bg-layer-* fallback inside var(...) is fine; painting the hover *with* it is not.
+const invisibleHover = hoverRules.filter((rule) => /background:\s*var\(--dsw-alias-bg-layer-/.test(rule))
+check('hover backgrounds use the interactive aliases', invisibleHover.length === 0, invisibleHover.join(' | '))
+check('the strip has a hover state', /\.ocg-summary:hover \{[^}]*interactive-bg-hover/.test(css.replace(/\n/g, ' ')))
+check('the open popover keeps its trigger highlighted', css.includes('[data-expanded="true"] .ocg-summary'))
+check('hover is gated on a pointing device', css.includes('@media (hover: hover)'))
+check('pressing a control repaints it', (css.match(/:active \{[^}]*interactive-bg-active/g) ?? []).length >= 3)
+
 check('type comes from the host scale', css.includes('var(--dsw-font-xxs-12') && css.includes('var(--dsw-font-xs-strong-13'))
 check('surfaces come from the host aliases', css.includes('var(--dsw-alias-bg-layer-3'))
 check('labels stay dimmer than values', /\.ocg-pop-label \{[^}]*label-tertiary/.test(css) && /\.ocg-pop-value \{[^}]*label-primary/.test(css))
