@@ -60,11 +60,11 @@
       "versions": [
         {
           "version": "1.0.0",
-          "publishTimestamp": 1794471314,
+          "publishTimestamp": 1794471775,
           "source": {
             "type": "git",
             "url": "https://github.com/kzhw615/dsh-opencode-go-usage.git",
-            "commit": "0015a01de3d7f7e1a64beaa4d886fd0169ca9c23"
+            "commit": "c9556b1035ba638e235c24290820a1a2f1b38b2e"
           },
           "engines": {
             "dsh": ">=0.2.2-rc.2"
