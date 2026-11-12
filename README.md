@@ -74,6 +74,22 @@ about once a minute while the page is visible, and **Refresh** is not throttled.
 refresh keeps the last good numbers on screen with a *last refresh failed* note, and a
 window the endpoint does not report shows *Not reported* instead of disappearing.
 
+## Development
+
+No build step, no dependencies, no bundler. The test suite runs on plain Node and
+stubs both the Host context and React, so it works offline:
+
+```sh
+npm test        # guards + host route + rendered component
+npm run check    # node --check on both halves
+```
+
+`test/guards.test.mjs` asserts the invariants that are easy to break by hand: every
+class the component renders has a base style rule, the stylesheet only uses host
+tokens, the plugin never logs or returns the key, and exactly one outbound endpoint
+exists. `test/host.test.mjs` drives the real HTTP handler with a stubbed `fetch`.
+`test/client.test.mjs` renders the strip and popover with a small React shim.
+
 ## Notes for maintainers
 
 - The plugin mounts its own admitted HTTP route (`/opencode-go-usage`) instead of

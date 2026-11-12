@@ -41,5 +41,9 @@
     "opencode",
     "quota",
     "usage"
-  ]
+  ],
+  "scripts": {
+    "test": "node test/guards.test.mjs && node test/host.test.mjs && node test/client.test.mjs",
+    "check": "node --check index.js && node --check client.js"
+  }
 }
