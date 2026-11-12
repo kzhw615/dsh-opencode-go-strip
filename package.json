@@ -1,6 +1,6 @@
 {
   "name": "dsh-opencode-go-strip",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Shows OpenCode Go plan usage (5-hour, weekly, monthly) in a strip below the composer",
   "license": "MIT",
