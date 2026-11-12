@@ -1,0 +1,76 @@
+{
+  "format": 1,
+  "title": {
+    "en": "DeepSeek Harness plugins",
+    "zh-hans": "DeepSeek Harness 插件"
+  },
+  "description": {
+    "en": "Small bundles that extend the DeepSeek Harness interface.",
+    "zh-hans": "给 DeepSeek Harness 界面加功能的独立 bundle。"
+  },
+  "metadata": {
+    "categories": {
+      "interface": {
+        "title": {
+          "en": "Interface",
+          "zh-hans": "界面"
+        }
+      }
+    },
+    "labels": {
+      "composer": {
+        "title": {
+          "en": "Composer",
+          "zh-hans": "输入框"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-opencode-go-strip",
+      "title": {
+        "en": "OpenCode Go quota",
+        "zh-hans": "OpenCode Go 额度"
+      },
+      "description": {
+        "en": "Adds a compact OpenCode Go quota strip below the composer showing how much of the 5-hour, weekly, and monthly Go plan windows you have used; click it for a popover with each window's reset countdown, a refresh action, and the API key setting. The key is read from this profile's stored credential, then OPENCODE_GO_API_KEY (or OPENCODE_ZEN_GO_API_KEY / OPENCODE_API_KEY), then the local OpenCode auth.json (opencode-go entry, honoring XDG_DATA_HOME and OPENCODE_AUTH_CONTENT), and can be saved or cleared from the panel. The Host sends the key only to https://opencode.ai/zen/go/v1/usage, about once a minute unless you press Refresh, and the endpoint returns percentages only, so no dollar amounts are derived. Turn the plugin off to remove the strip and its channel; nothing else in DSH changes.",
+        "zh-hans": "在输入框下方加一条紧凑的 OpenCode Go 额度细条，显示 5 小时、本周、本月三个套餐窗口的已用比例；点击会在细条上方弹出面板，显示各窗口重置倒计时，可手动刷新和设置 API Key。Key 依次取自本 profile 保存的凭证、OPENCODE_GO_API_KEY（或 OPENCODE_ZEN_GO_API_KEY / OPENCODE_API_KEY）、本地 OpenCode 的 auth.json（opencode-go 条目，支持 XDG_DATA_HOME 与 OPENCODE_AUTH_CONTENT），也可以在面板里保存或清除。Host 只会把 Key 发往 https://opencode.ai/zen/go/v1/usage，约每分钟一次（手动刷新不受限）；该接口只返回百分比，因此不会推算美元金额。关闭插件即移除细条和它使用的频道，不影响 DSH 其他功能。"
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Ik9wZW5Db2RlIEdvIHF1b3RhIj4KICA8cGF0aCBkPSJNMTAuMiAyNS44IEExMSAxMSAwIDEgMCAyNS44IDI1LjgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2I5Y2RkZCIgc3Ryb2tlLXdpZHRoPSIzLjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xMC4yIDI1LjggQTExIDExIDAgMCAwIDIzLjAgOC4yIiBmaWxsPSJub25lIiBzdHJva2U9IiMyNDdiYmYiIHN0cm9rZS13aWR0aD0iMy40IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSIxOCIgY3k9IjE4IiByPSIyLjMiIGZpbGw9IiMyNDdiYmYiLz4KPC9zdmc+",
+      "homepage": "https://github.com/kzhw615/dsh-opencode-go-usage#readme",
+      "repository": {
+        "url": "https://github.com/kzhw615/dsh-opencode-go-usage"
+      },
+      "metadata": {
+        "category": "interface",
+        "labels": [
+          "composer"
+        ],
+        "keywords": [
+          "dsh",
+          "deepseek-harness",
+          "plugin",
+          "dsh-plugin",
+          "opencode",
+          "quota",
+          "usage"
+        ]
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "publishTimestamp": 1794471314,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/kzhw615/dsh-opencode-go-usage.git",
+            "commit": "0015a01de3d7f7e1a64beaa4d886fd0169ca9c23"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.2"
+          }
+        }
+      ]
+    }
+  ]
+}
