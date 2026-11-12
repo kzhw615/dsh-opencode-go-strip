@@ -31,9 +31,37 @@ The three windows come from the OpenCode Go plan: rolling 5-hour, weekly, monthl
 
 ## Install
 
-1. Clone or download this repository.
-2. In DSH: **Settings › Plugins › Add plugin**, then pick this directory.
-3. The bundle enables itself; the strip appears the next time a session is open.
+The repository is a complete DSH bundle: no dependencies, no build step.
+
+**From GitHub, without cloning** — open **Settings › Plugins › Add plugin** and paste
+either address:
+
+```
+github:kzhw615/dsh-opencode-go-usage
+```
+
+or the repository URL itself:
+
+```
+https://github.com/kzhw615/dsh-opencode-go-usage
+```
+
+DSH checks the repository, installs it with its bundled pnpm, and verifies the bundle
+patch. To pick up later commits, remove the bundle and add it again — an unchanged
+address is reported as already installed.
+
+**From a checkout** — clone the repository, then **Settings › Plugins › Add plugin**
+and choose the directory.
+
+Either way the bundle enables itself; the strip appears the next time a session is
+open.
+
+Two limits worth knowing:
+
+- The package is not published to npm, so it does not appear in any plugin catalog.
+  Install it from the address above.
+- `package.json` declares `engines.dsh: ">=0.2.2-rc.2"`. An older DSH refuses the
+  install instead of rendering a strip that never appears.
 
 ## Configure the key
 
@@ -131,9 +159,30 @@ DSH（DeepSeek Harness）的 OpenCode Go 额度插件：输入框下方一条细
 
 ### 安装
 
-1. 下载本仓库；
-2. DSH 里 **设置 › 插件 › 添加插件**，选择本目录；
-3. 打开会话即可看到细条。
+本仓库本身就是一个完整 bundle（无依赖、无构建步骤）。
+
+**不用 clone**：打开 **设置 › 插件 › 添加插件**，粘贴下面任一地址：
+
+```
+github:kzhw615/dsh-opencode-go-usage
+```
+
+或者仓库地址本身：
+
+```
+https://github.com/kzhw615/dsh-opencode-go-usage
+```
+
+DSH 会先检查仓库、用内置 pnpm 安装并校验 bundle patch。想更新到新提交，移除后重新添加
+即可（地址没变时会被判定为「已安装」）。
+
+**已经 clone 了**：**设置 › 插件 › 添加插件**，选择该目录即可。
+
+两种情况都会自动启用，打开会话就能看到细条。
+
+两点限制：本包未发布到 npm，所以不会出现在插件市场里，只能按上面的地址安装；
+`package.json` 声明了 `engines.dsh: ">=0.2.2-rc.2"`，更老的 DSH 会直接拒绝安装，
+而不是装上去却看不到细条。
 
 ### 配置 Key
 

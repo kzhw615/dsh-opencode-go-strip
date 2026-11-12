@@ -45,5 +45,8 @@
   "scripts": {
     "test": "node test/guards.test.mjs && node test/host.test.mjs && node test/client.test.mjs",
     "check": "node --check index.js && node --check client.js"
+  },
+  "engines": {
+    "dsh": ">=0.2.2-rc.2"
   }
 }
