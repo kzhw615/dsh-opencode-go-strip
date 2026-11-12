@@ -52,13 +52,19 @@ if (dryRun) {
 manifest.version = next
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 
-// Tests gate the release; a broken bundle must never reach the index.
-run('npm', ['test', '--silent'])
+// The code tests gate the release. The index test cannot run yet: the committed
+// index still names the previous release, and the next one is generated below.
+run('node', ['test/guards.test.mjs'])
+run('node', ['test/host.test.mjs'])
+run('node', ['test/client.test.mjs'])
 git('add', 'package.json')
 git('commit', '-m', `release: v${next}`)
 
 // Now HEAD carries the new version, so the index may pin it.
 run('node', ['scripts/build-index.mjs'])
+// Now the index must agree with the bumped manifest, so it is checked before it
+// is committed.
+run('node', ['test/index.test.mjs'])
 git('add', 'plugin-index.json')
 git('commit', '-m', `release: pin the plugin-market index to v${next}`)
 git('tag', '-a', tag, '-m', `v${next}`)
