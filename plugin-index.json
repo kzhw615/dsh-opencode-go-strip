@@ -38,9 +38,9 @@
         "zh-hans": "在输入框下方加一条紧凑的 OpenCode Go 额度细条，显示 5 小时、本周、本月三个套餐窗口的已用比例；点击会在细条上方弹出面板，显示各窗口重置倒计时，可手动刷新和设置 API Key。Key 依次取自本 profile 保存的凭证、OPENCODE_GO_API_KEY（或 OPENCODE_ZEN_GO_API_KEY / OPENCODE_API_KEY）、本地 OpenCode 的 auth.json（opencode-go 条目，支持 XDG_DATA_HOME 与 OPENCODE_AUTH_CONTENT），也可以在面板里保存或清除。Host 只会把 Key 发往 https://opencode.ai/zen/go/v1/usage，约每分钟一次（手动刷新不受限）；该接口只返回百分比，因此不会推算美元金额。关闭插件即移除细条和它使用的频道，不影响 DSH 其他功能。"
       },
       "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Ik9wZW5Db2RlIEdvIHF1b3RhIj4KICA8cGF0aCBkPSJNMTAuMiAyNS44IEExMSAxMSAwIDEgMCAyNS44IDI1LjgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2I5Y2RkZCIgc3Ryb2tlLXdpZHRoPSIzLjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xMC4yIDI1LjggQTExIDExIDAgMCAwIDIzLjAgOC4yIiBmaWxsPSJub25lIiBzdHJva2U9IiMyNDdiYmYiIHN0cm9rZS13aWR0aD0iMy40IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSIxOCIgY3k9IjE4IiByPSIyLjMiIGZpbGw9IiMyNDdiYmYiLz4KPC9zdmc+",
-      "homepage": "https://github.com/kzhw615/dsh-opencode-go-usage#readme",
+      "homepage": "https://github.com/kzhw615/dsh-opencode-go-strip#readme",
       "repository": {
-        "url": "https://github.com/kzhw615/dsh-opencode-go-usage"
+        "url": "https://github.com/kzhw615/dsh-opencode-go-strip"
       },
       "metadata": {
         "category": "interface",
@@ -59,12 +59,12 @@
       },
       "versions": [
         {
-          "version": "1.0.0",
-          "publishTimestamp": 1794471775,
+          "version": "1.1.0",
+          "publishTimestamp": 1794474578,
           "source": {
             "type": "git",
-            "url": "https://github.com/kzhw615/dsh-opencode-go-usage.git",
-            "commit": "c9556b1035ba638e235c24290820a1a2f1b38b2e"
+            "url": "https://github.com/kzhw615/dsh-opencode-go-strip.git",
+            "commit": "5062e1a2d0bd7a5cb7fb0c88dca05ab7310b9952"
           },
           "engines": {
             "dsh": ">=0.2.2-rc.2"
