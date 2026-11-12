@@ -551,6 +551,10 @@ window.__ModuleLoader__.load({
     function useClock(intervalMs) {
       const [now, setNow] = React.useState(() => Date.now())
       React.useEffect(() => {
+        // A paused clock (interval 0) keeps the collapsed strip from re-rendering
+        // every half minute for countdowns nobody can see.
+        if (!(intervalMs > 0)) return undefined
+        setNow(Date.now())
         const id = setInterval(() => { setNow(Date.now()) }, intervalMs)
         return () => { clearInterval(id) }
       }, [intervalMs])
@@ -572,7 +576,6 @@ window.__ModuleLoader__.load({
       function QuotaStrip() {
         // Re-render on locale switches without owning a state copy of the locale.
         React.useSyncExternalStore(subscribeLocale, getLocaleRevision, getLocaleRevision)
-        const now = useClock(CLOCK_MS)
         const [snapshot, setSnapshot] = React.useState({ status: 'loading' })
         const [expanded, setExpanded] = React.useState(false)
         const [busy, setBusy] = React.useState(false)
@@ -583,7 +586,10 @@ window.__ModuleLoader__.load({
         const [saving, setSaving] = React.useState(false)
         const [memoryOnly, setMemoryOnly] = React.useState(false)
         const [placement, setPlacement] = React.useState(null)
+        // Declared after `expanded` so the paused-clock read is initialised.
+        const now = useClock(expanded ? CLOCK_MS : 0)
         const lastGoodRef = React.useRef(undefined)
+        const keySourceRef = React.useRef(undefined)
         const refreshRef = React.useRef(() => {})
         const rootRef = React.useRef(null)
         const summaryRef = React.useRef(null)
@@ -607,9 +613,17 @@ window.__ModuleLoader__.load({
               if (!alive) return
               lastGoodRef.current = value
               setSnapshot({ status: 'ready', value })
+              // The usage payload already names the key source, so the dedicated
+              // key query only runs when that source actually changed.
+              if (value?.keySource !== undefined && value.keySource !== keySourceRef.current) {
+                keySourceRef.current = value.keySource
+                void loadKey()
+              }
             } catch (error) {
               if (!alive) return
-              setSnapshot({ status: 'error', code: error?.code ?? 'generic', message: error?.message ?? '' })
+              const code = error?.code ?? 'generic'
+              setSnapshot({ status: 'error', code, message: error?.message ?? '' })
+              if (code === 'no-key' || code === 'unauthorized') void loadKey()
             } finally {
               loading = false
               if (alive && force) setBusy(false)
@@ -623,7 +637,9 @@ window.__ModuleLoader__.load({
           const loadKey = async () => {
             try {
               const value = await callHost('key', {})
-              if (alive) setKeyInfo(value)
+              if (!alive) return
+              keySourceRef.current = value?.source ?? undefined
+              setKeyInfo(value)
             } catch {
               if (alive) setKeyInfo(null)
             }
@@ -640,8 +656,6 @@ window.__ModuleLoader__.load({
           const timer = setInterval(() => {
             if (typeof document !== 'undefined' && document.hidden) return
             void load(false)
-            // The key can appear on disk while the page stays open.
-            void loadKey()
           }, POLL_MS)
           const onVisibility = () => {
             if (typeof document !== 'undefined' && !document.hidden) void load(false)
@@ -672,14 +686,31 @@ window.__ModuleLoader__.load({
             const width = Math.min(300, Math.max(260, window.innerWidth - 24))
             const left = Math.min(Math.max(rect.left, 12), Math.max(12, window.innerWidth - width - 12))
             const bottom = Math.max(12, window.innerHeight - rect.top + 8)
-            setPlacement({ left, bottom, width })
+            // Scrolling fires this per frame: keep the previous object when nothing moved.
+            setPlacement((prev) => (prev !== null && prev.left === left && prev.bottom === bottom && prev.width === width
+              ? prev
+              : { left, bottom, width }))
+          }
+          // One placement per frame, however many scroll/resize events arrive.
+          let frame = 0
+          const schedule = () => {
+            if (typeof requestAnimationFrame !== 'function') {
+              place()
+              return
+            }
+            if (frame !== 0) return
+            frame = requestAnimationFrame(() => {
+              frame = 0
+              place()
+            })
           }
           place()
-          window.addEventListener('resize', place)
-          window.addEventListener('scroll', place, true)
+          window.addEventListener('resize', schedule)
+          window.addEventListener('scroll', schedule, true)
           return () => {
-            window.removeEventListener('resize', place)
-            window.removeEventListener('scroll', place, true)
+            if (frame !== 0 && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
+            window.removeEventListener('resize', schedule)
+            window.removeEventListener('scroll', schedule, true)
           }
         }, [expanded])
 
@@ -707,6 +738,8 @@ window.__ModuleLoader__.load({
         const worst = windows.reduce((acc, item) => Math.max(acc, item.percent), 0)
         const tone = problem !== null ? (noKey ? 'idle' : 'error') : toneOf(worst)
         const canStore = keyInfo === null || keyInfo.writable !== false
+        // No credential store in this profile: keep the form, force memory-only.
+        const forceMemory = keyInfo !== null && keyInfo.writable === false
         const sourceLabel = keySourceLabel(t, keyInfo)
 
         const saveKey = async (event) => {
@@ -719,7 +752,7 @@ window.__ModuleLoader__.load({
           setSaving(true)
           setSaveError(null)
           try {
-            const info = await callHost('setKey', { key: value, persist: !memoryOnly })
+            const info = await callHost('setKey', { key: value, persist: !memoryOnly && !forceMemory })
             setKeyInfo(info)
             setDraft('')
             setEditingKey(false)
@@ -746,7 +779,7 @@ window.__ModuleLoader__.load({
           }
         }
 
-        const keyForm = canStore && (editingKey || noKey)
+        const keyForm = (editingKey || noKey)
           ? h('form', { className: 'ocg-pop-foot', onSubmit: (event) => { void saveKey(event) } },
             h('input', {
               className: 'ocg-input',
@@ -766,17 +799,19 @@ window.__ModuleLoader__.load({
               className: 'ocg-btn',
               onClick: () => { setEditingKey(false); setDraft(''); setSaveError(null) },
             }, t('panel.cancel')),
-            h('label', { className: 'ocg-check' },
-              h('input', {
-                type: 'checkbox',
-                checked: memoryOnly,
-                onChange: (event) => { setMemoryOnly(event.target.checked) },
-              }),
-              h('span', null, t('panel.memoryOnly'))),
+            forceMemory
+              ? null
+              : h('label', { className: 'ocg-check' },
+                h('input', {
+                  type: 'checkbox',
+                  checked: memoryOnly,
+                  onChange: (event) => { setMemoryOnly(event.target.checked) },
+                }),
+                h('span', null, t('panel.memoryOnly'))),
           )
           : null
 
-        const storeHint = canStore ? null : h('div', { className: 'ocg-hint' }, t('panel.noStore'))
+        const storeHint = forceMemory ? h('div', { className: 'ocg-hint' }, t('panel.noStore')) : null
 
         const overrideHint = problem === 'unauthorized' && sourceLabel !== '' && keyInfo?.source !== 'stored'
           ? h('div', { className: 'ocg-hint' }, t('panel.override', { source: sourceLabel }))
@@ -824,6 +859,7 @@ window.__ModuleLoader__.load({
           ref: summaryRef,
           className: 'ocg-summary',
           'aria-expanded': expanded,
+          'aria-haspopup': 'dialog',
           title: noKey ? t('panel.setKey') : t('panel.title'),
           onClick: () => { setExpanded((open) => !open) },
         },
@@ -904,7 +940,7 @@ window.__ModuleLoader__.load({
               onClick: () => { void clearKey() },
             }, t('panel.clearKey'))
             : null,
-          noKey || !canStore
+          noKey
             ? null
             : h('button', {
               type: 'button',

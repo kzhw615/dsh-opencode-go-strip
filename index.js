@@ -119,13 +119,20 @@ function deadlineSignal(signal) {
     timedOut = true
     controller.abort(new Error('timeout'))
   }, REQUEST_TIMEOUT_MS)
-  const done = () => { clearTimeout(timer) }
+  let bridge
+  const done = () => {
+    clearTimeout(timer)
+    if (bridge !== undefined && signal !== undefined) signal.removeEventListener('abort', bridge)
+  }
   const timedOutYet = () => timedOut
   if (typeof AbortSignal.any === 'function') {
     const parts = signal === undefined ? [controller.signal] : [signal, controller.signal]
     return { signal: AbortSignal.any(parts), done, timedOut: timedOutYet }
   }
-  if (signal !== undefined) signal.addEventListener('abort', () => { controller.abort(signal.reason) }, { once: true })
+  if (signal !== undefined) {
+    bridge = () => { controller.abort(signal.reason) }
+    signal.addEventListener('abort', bridge, { once: true })
+  }
   return { signal: controller.signal, done, timedOut: timedOutYet }
 }
 
@@ -218,7 +225,10 @@ export function apply(ctx) {
       configured: resolved !== undefined,
       source: resolved?.source ?? null,
       masked: resolved === undefined ? null : maskKey(resolved.key),
+      // `writable` describes the credential store only: a session-only key works
+      // even when this profile has none, so the UI keeps that path open.
       writable,
+      memoryOnly: true,
     }
   }
 
@@ -240,7 +250,12 @@ export function apply(ctx) {
       if (!response.ok) {
         return fail('http', `OpenCode Go usage request failed with HTTP ${response.status}.`, { status: response.status })
       }
-      const body = await response.json()
+      let body
+      try {
+        body = await response.json()
+      } catch {
+        return fail('unexpected-payload', 'The OpenCode Go usage response was not JSON.')
+      }
       const usage = normalizeUsage(body)
       if (usage === undefined) {
         return fail('unexpected-payload', 'The OpenCode Go usage response carried no recognizable quota windows.')
