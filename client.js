@@ -216,16 +216,14 @@ window.__ModuleLoader__.load({
   outline: 2px solid var(--dsw-alias-brand-primary);
   outline-offset: 1px;
 }
-.ocg-mark {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
+.ocg-logo {
+  display: block;
   flex: 0 0 auto;
+  color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
 }
-.ocg-mark[data-tone="warn"] { background: var(--dsw-alias-state-warn-primary); }
-.ocg-mark[data-tone="error"] { background: var(--dsw-alias-state-error-primary); }
-.ocg-mark[data-tone="idle"] { background: var(--dsw-alias-state-idle-primary); }
+.ocg-logo[data-tone="warn"] { color: var(--dsw-alias-state-warn-primary); }
+.ocg-logo[data-tone="error"] { color: var(--dsw-alias-state-error-primary); }
+.ocg-logo[data-tone="idle"] { color: var(--dsw-alias-state-idle-primary); }
 .ocg-title {
   color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xxs-strong-12, 500 12px/18px var(--dsw-font-family, inherit));
@@ -249,9 +247,7 @@ window.__ModuleLoader__.load({
   font-variant-numeric: tabular-nums;
 }
 .ocg-spacer { flex: 1 1 auto; }
-.ocg-chevron { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); }
 .ocg-root[data-expanded="true"] .ocg-summary { background: var(--dsw-alias-bg-layer-2); }
-.ocg-root[data-expanded="true"] .ocg-chevron { transform: rotate(90deg); }
 .ocg-pop {
   position: fixed;
   z-index: 80;
@@ -1180,11 +1176,26 @@ window.__ModuleLoader__.load({
           title: noKey ? t('panel.setKey') : t('panel.title'),
           onClick: () => { setExpanded((open) => !open) },
         },
-        h('span', { className: 'ocg-mark', 'data-tone': tone }),
+                h('svg', {
+          className: 'ocg-logo',
+          viewBox: '128 96 256 320',
+          width: 11,
+          height: 14,
+          'data-tone': tone,
+          'aria-hidden': 'true',
+        },
+        // The frame, with its window cut out, then the panel inside it: the
+        // OpenCode mark from its own favicon, drawn in the current text colour.
+        h('path', {
+          fillRule: 'evenodd',
+          clipRule: 'evenodd',
+          fill: 'currentColor',
+          d: 'M384 416H128V96H384V416ZM320 160H192V352H320V160Z',
+        }),
+        h('path', { fill: 'currentColor', fillOpacity: 0.45, d: 'M320 224V352H192V224H320Z' })),
         h('span', { className: 'ocg-title' }, t('strip.label')),
         h('span', { className: 'ocg-spacer' }),
         ...summaryContent,
-        h('span', { className: 'ocg-chevron', 'aria-hidden': 'true' }, '▸'),
         )
 
         const cardHeader = h('div', { className: 'ocg-pop-head' },

@@ -9,8 +9,8 @@ a compact strip under the composer, and a popover with per-window rings.
 
 ![The quota strip below the composer](https://raw.githubusercontent.com/kzhw615/dsh-opencode-go-strip/main/docs/strip.png)
 
-- **Strip** (below the composer, always visible while a session is open): a status
-  dot, the `OpenCode Go` label, and one ring per plan window with its used percentage.
+- **Strip** (below the composer, always visible while a session is open): the OpenCode
+  mark, the `OpenCode Go` label, and one ring per plan window with its used percentage.
   Hovering a window shows its used/remaining split and reset countdown in place.
 - **Popover** (click the strip): the title, one row per window with a ring, the used
   percentage and the reset countdown, plus the API-key controls and a picker for
@@ -183,7 +183,7 @@ MIT — see [LICENSE](LICENSE).
 
 DSH（DeepSeek Harness）的 OpenCode Go 额度插件：输入框下方一条细条，点击弹出浮层。
 
-- **细条**：状态点 + `OpenCode Go` + 三个窗口的圆环与已用百分比。
+- **细条**：OpenCode 图标 + `OpenCode Go` + 三个窗口的圆环与已用百分比。
 - **浮层**：每个窗口一行（圆环、已用百分比、重置倒计时）+ Key 管理。点空白处或 <kbd>Esc</kbd> 关闭。
 - **圆环**：浅灰轨道是剩余，深灰弧是已用；到 70%/90% 变黄/变红。
 
